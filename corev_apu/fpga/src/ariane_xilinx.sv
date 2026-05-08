@@ -198,9 +198,16 @@ module ariane_xilinx (
   output logic        tx
 );
 
+typedef config_pkg::cva6_user_cfg_t cva6_user_cfg_t;
+typedef config_pkg::cva6_cfg_t cva6_cfg_t;
+typedef riscv::fcsr_t rvfi_fcsr_t;
+typedef riscv::dcsr_t rvfi_dcsr_t;
+typedef riscv::pmpcfg_t rvfi_pmpcfg_t;
+localparam int unsigned RvfiMHPMCounterNum = 6;
+
 // CVA6 Xilinx configuration
-function automatic config_pkg::cva6_cfg_t build_fpga_config(config_pkg::cva6_user_cfg_t CVA6UserCfg);
-  config_pkg::cva6_user_cfg_t cfg = CVA6UserCfg;
+function automatic cva6_cfg_t build_fpga_config(cva6_user_cfg_t CVA6UserCfg);
+  cva6_user_cfg_t cfg = CVA6UserCfg;
   cfg.RVZiCond = bit'(0);
   cfg.NrNonIdempotentRules = unsigned'(1);
   cfg.NonIdempotentAddrBase = 1024'({64'b0});
@@ -209,7 +216,7 @@ function automatic config_pkg::cva6_cfg_t build_fpga_config(config_pkg::cva6_use
 endfunction
 
 // CVA6 Xilinx configuration
-localparam config_pkg::cva6_cfg_t CVA6Cfg = build_fpga_config(cva6_config_pkg::cva6_cfg);
+localparam cva6_cfg_t CVA6Cfg = build_fpga_config(cva6_config_pkg::cva6_cfg);
 
 localparam type rvfi_instr_t = `RVFI_INSTR_T(CVA6Cfg);
 //localparam type rvfi_csr_elmt_t = `RVFI_CSR_ELMT_T(CVA6Cfg);
@@ -218,7 +225,41 @@ localparam type rvfi_to_iti_t = `RVFI_TO_ITI_T(CVA6Cfg);
 localparam type iti_to_encoder_t = `ITI_TO_ENCODER_T(CVA6Cfg);
 
 localparam type rvfi_probes_instr_t = `RVFI_PROBES_INSTR_T(CVA6Cfg);
-localparam type rvfi_probes_csr_t = `RVFI_PROBES_CSR_T(CVA6Cfg);
+localparam type rvfi_probes_csr_t = struct packed {
+  rvfi_fcsr_t fcsr_q;
+  rvfi_dcsr_t dcsr_q;
+  logic [CVA6Cfg.XLEN-1:0] jvt_q;
+  logic [CVA6Cfg.XLEN-1:0] dpc_q;
+  logic [CVA6Cfg.XLEN-1:0] dscratch0_q;
+  logic [CVA6Cfg.XLEN-1:0] dscratch1_q;
+  logic [CVA6Cfg.XLEN-1:0] mie_q;
+  logic [CVA6Cfg.XLEN-1:0] mip_q;
+  logic [CVA6Cfg.XLEN-1:0] stvec_q;
+  logic [CVA6Cfg.XLEN-1:0] scounteren_q;
+  logic [CVA6Cfg.XLEN-1:0] sscratch_q;
+  logic [CVA6Cfg.XLEN-1:0] sepc_q;
+  logic [CVA6Cfg.XLEN-1:0] scause_q;
+  logic [CVA6Cfg.XLEN-1:0] stval_q;
+  logic [CVA6Cfg.XLEN-1:0] satp_q;
+  logic [CVA6Cfg.XLEN-1:0] mstatus_extended;
+  logic [CVA6Cfg.XLEN-1:0] medeleg_q;
+  logic [CVA6Cfg.XLEN-1:0] mideleg_q;
+  logic [CVA6Cfg.XLEN-1:0] mtvec_q;
+  logic [CVA6Cfg.XLEN-1:0] mcounteren_q;
+  logic [CVA6Cfg.XLEN-1:0] mscratch_q;
+  logic [CVA6Cfg.XLEN-1:0] mepc_q;
+  logic [CVA6Cfg.XLEN-1:0] mcause_q;
+  logic [CVA6Cfg.XLEN-1:0] mtval_q;
+  logic fiom_q;
+  logic [RvfiMHPMCounterNum+3-1:0] mcountinhibit_q;
+  logic [63:0] cycle_q;
+  logic [63:0] instret_q;
+  logic [CVA6Cfg.XLEN-1:0] dcache_q;
+  logic [CVA6Cfg.XLEN-1:0] icache_q;
+  logic [CVA6Cfg.XLEN-1:0] acc_cons_q;
+  rvfi_pmpcfg_t [63:0] pmpcfg_q;
+  logic [63:0][CVA6Cfg.PLEN-3:0] pmpaddr_q;
+};
 localparam type rvfi_probes_t = struct packed {
   logic csr;
   rvfi_probes_instr_t instr;
