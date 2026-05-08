@@ -231,6 +231,19 @@ src :=  $(if $(spike-tandem),verif/tb/core/uvma_core_cntrl_pkg.sv)              
         corev_apu/instr_tracing/rv_encapsulator-main/src/rtl/encapsulator.sv
 src := $(addprefix $(root-dir), $(src))
 
+RV_MALTRACE_ROOT ?= $(abspath $(root-dir)/../..)
+ifeq ($(RV_MALTRACE_TRACE),1)
+ifeq ($(strip $(defines)),)
+defines := RV_MALTRACE_TRACE
+else
+defines := $(strip $(defines)+RV_MALTRACE_TRACE)
+endif
+rvmt_src := $(RV_MALTRACE_ROOT)/rtl/trace/trace_pkg.sv \
+            $(RV_MALTRACE_ROOT)/rtl/trace/cva6_rvfi_trace_adapter.sv \
+            $(RV_MALTRACE_ROOT)/sim/tb/tb_trace_sink.sv
+src := $(rvmt_src) $(src)
+endif
+
 copro_src := core/cvxif_example/include/cvxif_instr_pkg.sv \
              $(wildcard core/cvxif_example/*.sv)
 copro_src := $(addprefix $(root-dir), $(copro_src))

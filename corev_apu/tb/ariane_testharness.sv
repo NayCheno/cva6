@@ -630,6 +630,35 @@ module ariane_testharness #(
   rvfi_instr_t [CVA6Cfg.NrCommitPorts-1:0]  rvfi_instr;
   rvfi_to_iti_t rvfi_to_iti;
   iti_to_encoder_t iti_to_encoder;
+`ifdef RV_MALTRACE_TRACE
+  trace_pkg::trace_packet_t rvmt_trace_packet;
+  logic                     rvmt_trace_valid;
+  logic                     rvmt_csr_valid;
+  logic [11:0]              rvmt_csr_addr;
+  logic [CVA6Cfg.XLEN-1:0]  rvmt_csr_wdata;
+  logic [CVA6Cfg.NrCommitPorts-1:0] rvmt_rvfi_valid;
+  logic [CVA6Cfg.NrCommitPorts-1:0][config_pkg::ILEN-1:0] rvmt_rvfi_insn;
+  logic [CVA6Cfg.NrCommitPorts-1:0] rvmt_rvfi_trap;
+  logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_cause;
+  logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_tval;
+  logic [CVA6Cfg.NrCommitPorts-1:0][1:0] rvmt_rvfi_mode;
+  logic [CVA6Cfg.NrCommitPorts-1:0] rvmt_rvfi_compressed;
+  logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.VLEN-1:0] rvmt_rvfi_pc;
+  logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_rs1;
+  logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_rs2;
+  logic [CVA6Cfg.NrCommitPorts-1:0][4:0] rvmt_rvfi_rd;
+  logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_rd_wdata;
+
+  localparam logic [11:0] RVMT_CSR_SSTATUS = 12'h100;
+  localparam logic [11:0] RVMT_CSR_STVEC   = 12'h105;
+  localparam logic [11:0] RVMT_CSR_SEPC    = 12'h141;
+  localparam logic [11:0] RVMT_CSR_SCAUSE  = 12'h142;
+  localparam logic [11:0] RVMT_CSR_STVAL   = 12'h143;
+  localparam logic [11:0] RVMT_CSR_SATP    = 12'h180;
+  localparam logic [11:0] RVMT_CSR_MSTATUS = 12'h300;
+  localparam logic [11:0] RVMT_CSR_MEDELEG = 12'h302;
+  localparam logic [11:0] RVMT_CSR_MIDELEG = 12'h303;
+`endif
 
   ariane #(
     .CVA6Cfg              ( CVA6Cfg             ),
@@ -805,6 +834,102 @@ module ariane_testharness #(
       .rvfi_to_iti_o   (rvfi_to_iti),
       .rvfi_csr_o   (rvfi_csr)
   );
+
+`ifdef RV_MALTRACE_TRACE
+  for (genvar rvmt_port = 0; rvmt_port < CVA6Cfg.NrCommitPorts; rvmt_port++) begin : gen_rvmt_rvfi
+    assign rvmt_rvfi_valid[rvmt_port] = rvfi_instr[rvmt_port].valid[0];
+    assign rvmt_rvfi_insn[rvmt_port] = rvfi_instr[rvmt_port].insn[config_pkg::ILEN-1:0];
+    assign rvmt_rvfi_trap[rvmt_port] = rvfi_instr[rvmt_port].trap[0];
+    assign rvmt_rvfi_cause[rvmt_port] = rvfi_instr[rvmt_port].cause[CVA6Cfg.XLEN-1:0];
+    assign rvmt_rvfi_tval[rvmt_port] = rvfi_to_iti.tval;
+    assign rvmt_rvfi_mode[rvmt_port] = rvfi_instr[rvmt_port].mode[1:0];
+    assign rvmt_rvfi_compressed[rvmt_port] = rvfi_to_iti.is_compressed[rvmt_port];
+    assign rvmt_rvfi_pc[rvmt_port] = rvfi_instr[rvmt_port].pc_rdata[CVA6Cfg.VLEN-1:0];
+    assign rvmt_rvfi_rs1[rvmt_port] = rvfi_instr[rvmt_port].rs1_rdata[CVA6Cfg.XLEN-1:0];
+    assign rvmt_rvfi_rs2[rvmt_port] = rvfi_instr[rvmt_port].rs2_rdata[CVA6Cfg.XLEN-1:0];
+    assign rvmt_rvfi_rd[rvmt_port] = rvfi_instr[rvmt_port].rd_addr[4:0];
+    assign rvmt_rvfi_rd_wdata[rvmt_port] = rvfi_instr[rvmt_port].rd_wdata[CVA6Cfg.XLEN-1:0];
+  end
+
+  always_comb begin
+    rvmt_csr_valid = 1'b0;
+    rvmt_csr_addr  = 12'h000;
+    rvmt_csr_wdata = '0;
+
+    if (|rvfi_csr.satp.wmask) begin
+      rvmt_csr_valid = 1'b1;
+      rvmt_csr_addr  = RVMT_CSR_SATP;
+      rvmt_csr_wdata = rvfi_csr.satp.wdata;
+    end else if (|rvfi_csr.mstatus.wmask) begin
+      rvmt_csr_valid = 1'b1;
+      rvmt_csr_addr  = RVMT_CSR_MSTATUS;
+      rvmt_csr_wdata = rvfi_csr.mstatus.wdata;
+    end else if (|rvfi_csr.sstatus.wmask) begin
+      rvmt_csr_valid = 1'b1;
+      rvmt_csr_addr  = RVMT_CSR_SSTATUS;
+      rvmt_csr_wdata = rvfi_csr.sstatus.wdata;
+    end else if (|rvfi_csr.stvec.wmask) begin
+      rvmt_csr_valid = 1'b1;
+      rvmt_csr_addr  = RVMT_CSR_STVEC;
+      rvmt_csr_wdata = rvfi_csr.stvec.wdata;
+    end else if (|rvfi_csr.sepc.wmask) begin
+      rvmt_csr_valid = 1'b1;
+      rvmt_csr_addr  = RVMT_CSR_SEPC;
+      rvmt_csr_wdata = rvfi_csr.sepc.wdata;
+    end else if (|rvfi_csr.scause.wmask) begin
+      rvmt_csr_valid = 1'b1;
+      rvmt_csr_addr  = RVMT_CSR_SCAUSE;
+      rvmt_csr_wdata = rvfi_csr.scause.wdata;
+    end else if (|rvfi_csr.stval.wmask) begin
+      rvmt_csr_valid = 1'b1;
+      rvmt_csr_addr  = RVMT_CSR_STVAL;
+      rvmt_csr_wdata = rvfi_csr.stval.wdata;
+    end else if (|rvfi_csr.medeleg.wmask) begin
+      rvmt_csr_valid = 1'b1;
+      rvmt_csr_addr  = RVMT_CSR_MEDELEG;
+      rvmt_csr_wdata = rvfi_csr.medeleg.wdata;
+    end else if (|rvfi_csr.mideleg.wmask) begin
+      rvmt_csr_valid = 1'b1;
+      rvmt_csr_addr  = RVMT_CSR_MIDELEG;
+      rvmt_csr_wdata = rvfi_csr.mideleg.wdata;
+    end
+  end
+
+  cva6_rvfi_trace_adapter #(
+      .COMMIT_PORTS(CVA6Cfg.NrCommitPorts),
+      .XLEN(CVA6Cfg.XLEN),
+      .ILEN(config_pkg::ILEN),
+      .VLEN(CVA6Cfg.VLEN)
+  ) i_rvmt_trace_adapter (
+      .clk_i(clk_i),
+      .rst_ni(ndmreset_n),
+      .rvfi_valid_i(rvmt_rvfi_valid),
+      .rvfi_insn_i(rvmt_rvfi_insn),
+      .rvfi_trap_i(rvmt_rvfi_trap),
+      .rvfi_cause_i(rvmt_rvfi_cause),
+      .rvfi_tval_i(rvmt_rvfi_tval),
+      .rvfi_mode_i(rvmt_rvfi_mode),
+      .rvfi_compressed_i(rvmt_rvfi_compressed),
+      .rvfi_pc_rdata_i(rvmt_rvfi_pc),
+      .rvfi_rs1_rdata_i(rvmt_rvfi_rs1),
+      .rvfi_rs2_rdata_i(rvmt_rvfi_rs2),
+      .rvfi_rd_addr_i(rvmt_rvfi_rd),
+      .rvfi_rd_wdata_i(rvmt_rvfi_rd_wdata),
+      .csr_valid_i(rvmt_csr_valid),
+      .csr_addr_i(rvmt_csr_addr),
+      .csr_wdata_i(rvmt_csr_wdata),
+      .satp_i(rvfi_csr.satp.wdata),
+      .trace_valid_o(rvmt_trace_valid),
+      .trace_packet_o(rvmt_trace_packet)
+  );
+
+  tb_trace_sink i_rvmt_trace_sink (
+      .clk_i(clk_i),
+      .rst_ni(ndmreset_n),
+      .trace_valid_i(rvmt_trace_valid),
+      .trace_packet_i(rvmt_trace_packet)
+  );
+`endif
 
   rvfi_tracer  #(
     .CVA6Cfg(CVA6Cfg),
