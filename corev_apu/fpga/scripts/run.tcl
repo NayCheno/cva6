@@ -51,6 +51,10 @@ set_property include_dirs { \
 	"../../core/include" \
 } [current_fileset]
 
+if {[info exists ::env(RVMT_VIVADO_VERILOG_DEFINES)] && $::env(RVMT_VIVADO_VERILOG_DEFINES) ne ""} {
+    set_property verilog_define [split $::env(RVMT_VIVADO_VERILOG_DEFINES) ","] [current_fileset]
+}
+
 source scripts/add_sources.tcl
 
 set_property top ${project}_xilinx [current_fileset]

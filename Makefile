@@ -244,6 +244,12 @@ rvmt_src := $(RV_MALTRACE_ROOT)/rtl/trace/trace_pkg.sv \
 src := $(rvmt_src) $(src)
 endif
 
+ifeq ($(RV_MALTRACE_FPGA_TRACE),1)
+rvmt_fpga_src := $(RV_MALTRACE_ROOT)/rtl/trace/trace_pkg.sv \
+                 $(RV_MALTRACE_ROOT)/rtl/trace/cva6_rvfi_trace_adapter.sv
+src := $(rvmt_fpga_src) $(src)
+endif
+
 copro_src := core/cvxif_example/include/cvxif_instr_pkg.sv \
              $(wildcard core/cvxif_example/*.sv)
 copro_src := $(addprefix $(root-dir), $(copro_src))

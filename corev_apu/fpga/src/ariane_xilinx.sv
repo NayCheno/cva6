@@ -818,6 +818,27 @@ rvfi_instr_t [CVA6Cfg.NrCommitPorts-1:0]  rvfi_instr;
 rvfi_to_iti_t rvfi_to_iti;
 iti_to_encoder_t iti_to_encoder;
 
+`ifdef RV_MALTRACE_FPGA_TRACE
+logic [CVA6Cfg.NrCommitPorts-1:0] rvmt_rvfi_valid;
+logic [CVA6Cfg.NrCommitPorts-1:0][config_pkg::ILEN-1:0] rvmt_rvfi_insn;
+logic [CVA6Cfg.NrCommitPorts-1:0] rvmt_rvfi_trap;
+logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_cause;
+logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_tval;
+logic [CVA6Cfg.NrCommitPorts-1:0][1:0] rvmt_rvfi_mode;
+logic [CVA6Cfg.NrCommitPorts-1:0] rvmt_rvfi_compressed;
+logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.VLEN-1:0] rvmt_rvfi_pc;
+logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.VLEN-1:0] rvmt_rvfi_pc_wdata;
+logic [CVA6Cfg.NrCommitPorts-1:0] rvmt_rvfi_sret_to_user;
+logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_rs1;
+logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_rs2;
+logic [CVA6Cfg.NrCommitPorts-1:0][4:0] rvmt_rvfi_rd;
+logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_rd_wdata;
+trace_pkg::trace_packet_t rvmt_trace_packet;
+logic rvmt_trace_valid;
+(* keep = "true", dont_touch = "true" *) logic [63:0] rvmt_trace_event_count;
+(* keep = "true", dont_touch = "true" *) logic [63:0] rvmt_trace_event_hash;
+`endif
+
 ariane #(
     .CVA6Cfg ( CVA6Cfg ),
     .rvfi_probes_instr_t ( rvfi_probes_instr_t ),
@@ -856,6 +877,66 @@ ariane #(
       .rvfi_to_iti_o   (rvfi_to_iti),
       .rvfi_csr_o   ()
   );
+
+`ifdef RV_MALTRACE_FPGA_TRACE
+  for (genvar rvmt_port = 0; rvmt_port < CVA6Cfg.NrCommitPorts; rvmt_port++) begin : gen_rvmt_trace_map
+    assign rvmt_rvfi_valid[rvmt_port] = rvfi_instr[rvmt_port].valid[0];
+    assign rvmt_rvfi_insn[rvmt_port] = rvfi_instr[rvmt_port].insn[config_pkg::ILEN-1:0];
+    assign rvmt_rvfi_trap[rvmt_port] = rvfi_instr[rvmt_port].trap[0];
+    assign rvmt_rvfi_cause[rvmt_port] = rvfi_instr[rvmt_port].cause[CVA6Cfg.XLEN-1:0];
+    assign rvmt_rvfi_tval[rvmt_port] = rvfi_to_iti.tval[CVA6Cfg.XLEN-1:0];
+    assign rvmt_rvfi_mode[rvmt_port] = rvfi_instr[rvmt_port].mode[1:0];
+    assign rvmt_rvfi_compressed[rvmt_port] = rvfi_to_iti.is_compressed[rvmt_port];
+    assign rvmt_rvfi_pc[rvmt_port] = rvfi_instr[rvmt_port].pc_rdata[CVA6Cfg.VLEN-1:0];
+    assign rvmt_rvfi_pc_wdata[rvmt_port] = rvfi_instr[rvmt_port].pc_wdata[CVA6Cfg.VLEN-1:0];
+    assign rvmt_rvfi_sret_to_user[rvmt_port] = 1'b0;
+    assign rvmt_rvfi_rs1[rvmt_port] = rvfi_instr[rvmt_port].rs1_rdata[CVA6Cfg.XLEN-1:0];
+    assign rvmt_rvfi_rs2[rvmt_port] = rvfi_instr[rvmt_port].rs2_rdata[CVA6Cfg.XLEN-1:0];
+    assign rvmt_rvfi_rd[rvmt_port] = rvfi_instr[rvmt_port].rd_addr[4:0];
+    assign rvmt_rvfi_rd_wdata[rvmt_port] = rvfi_instr[rvmt_port].rd_wdata[CVA6Cfg.XLEN-1:0];
+  end
+
+  cva6_rvfi_trace_adapter #(
+      .COMMIT_PORTS(CVA6Cfg.NrCommitPorts),
+      .XLEN(CVA6Cfg.XLEN),
+      .ILEN(config_pkg::ILEN),
+      .VLEN(CVA6Cfg.VLEN)
+  ) i_rvmt_trace_adapter (
+      .clk_i(clk),
+      .rst_ni(ndmreset_n),
+      .rvfi_valid_i(rvmt_rvfi_valid),
+      .rvfi_insn_i(rvmt_rvfi_insn),
+      .rvfi_trap_i(rvmt_rvfi_trap),
+      .rvfi_cause_i(rvmt_rvfi_cause),
+      .rvfi_tval_i(rvmt_rvfi_tval),
+      .rvfi_mode_i(rvmt_rvfi_mode),
+      .rvfi_compressed_i(rvmt_rvfi_compressed),
+      .rvfi_pc_rdata_i(rvmt_rvfi_pc),
+      .rvfi_pc_wdata_i(rvmt_rvfi_pc_wdata),
+      .rvfi_sret_to_user_i(rvmt_rvfi_sret_to_user),
+      .rvfi_rs1_rdata_i(rvmt_rvfi_rs1),
+      .rvfi_rs2_rdata_i(rvmt_rvfi_rs2),
+      .rvfi_rd_addr_i(rvmt_rvfi_rd),
+      .rvfi_rd_wdata_i(rvmt_rvfi_rd_wdata),
+      .csr_valid_i(1'b0),
+      .csr_addr_i('0),
+      .csr_wdata_i('0),
+      .satp_i('0),
+      .trace_valid_o(rvmt_trace_valid),
+      .trace_packet_o(rvmt_trace_packet)
+  );
+
+  always_ff @(posedge clk or negedge ndmreset_n) begin
+    if (~ndmreset_n) begin
+      rvmt_trace_event_count <= 64'd0;
+      rvmt_trace_event_hash <= 64'd0;
+    end else if (rvmt_trace_valid && rvmt_trace_packet.valid) begin
+      rvmt_trace_event_count <= rvmt_trace_event_count + 64'd1;
+      rvmt_trace_event_hash <= rvmt_trace_event_hash ^ rvmt_trace_packet.pc ^
+                               rvmt_trace_packet.cycle ^ {60'd0, rvmt_trace_packet.evt};
+    end
+  end
+`endif
 
 
     cva6_iti #(

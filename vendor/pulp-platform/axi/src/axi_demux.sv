@@ -152,6 +152,9 @@ module axi_demux #(
     // Workaround for bug in Questa 2020.2 and 2021.1: Flatten the struct into a logic vector before
     // instantiating `spill_register`.
     typedef logic [$bits(aw_chan_select_t)-1:0] aw_chan_select_flat_t;
+    `elsif XSIM
+    // Vivado xsim 2025.2 can hit the same packed-struct spill_register path.
+    typedef logic [$bits(aw_chan_select_t)-1:0] aw_chan_select_flat_t;
     `else
     typedef aw_chan_select_t aw_chan_select_flat_t;
     `endif
@@ -341,6 +344,9 @@ module axi_demux #(
     // Workaround for bug in Questa 2020.2 and 2021.1: Flatten the struct into a logic vector before
     // instantiating `spill_register`.
     typedef logic [$bits(ar_chan_select_t)-1:0] ar_chan_select_flat_t;
+    `elsif XSIM
+    // Vivado xsim 2025.2 can hit the same packed-struct spill_register path.
+    typedef logic [$bits(ar_chan_select_t)-1:0] ar_chan_select_flat_t;
     `else
     typedef ar_chan_select_t ar_chan_select_flat_t;
     `endif
@@ -487,7 +493,9 @@ module axi_demux #(
     // as mst_reqs_o has to be drivem from the same always comb block!
     always_comb begin
       // default assignments
+`ifndef XSIM
       mst_reqs_o  = '0;
+`endif
       slv_w_ready = 1'b0;
       w_fifo_pop  = 1'b0;
 

@@ -32,6 +32,7 @@ module ariane_testharness #(
   parameter int unsigned AXI_DATA_WIDTH    = 64,
   parameter bit          InclSimDTM        = 1'b1,
   parameter int unsigned NUM_WORDS         = 2**25,         // memory size
+  parameter logic [AXI_ADDRESS_WIDTH-1:0] BOOT_ADDR = ariane_soc::ROMBase,
   parameter bit          StallRandomOutput = 1'b0,
   parameter bit          StallRandomInput  = 1'b0
 ) (
@@ -670,7 +671,7 @@ module ariane_testharness #(
   ) i_ariane (
     .clk_i                ( clk_i               ),
     .rst_ni               ( ndmreset_n          ),
-    .boot_addr_i          ( ariane_soc::ROMBase ), // start fetching from ROM
+    .boot_addr_i          ( BOOT_ADDR           ),
     .hart_id_i            ( {56'h0, hart_id}    ),
     .irq_i                ( irqs                ),
     .ipi_i                ( ipi                 ),
