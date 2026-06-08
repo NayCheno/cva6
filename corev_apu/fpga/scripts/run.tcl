@@ -39,6 +39,20 @@ read_ip { \
       "xilinx/xlnx_clk_gen/xlnx_clk_gen.srcs/sources_1/ip/xlnx_clk_gen/xlnx_clk_gen.xci" \
       "xilinx/xlnx_dpti_clk/xlnx_dpti_clk.srcs/sources_1/ip/xlnx_dpti_clk/xlnx_dpti_clk.xci" \
 }
+
+set rvmt_trace_build 0
+if {[info exists ::env(RV_MALTRACE_FPGA_TRACE)] && $::env(RV_MALTRACE_FPGA_TRACE) eq "1"} {
+    set rvmt_trace_build 1
+}
+if {[info exists ::env(RVMT_VIVADO_VERILOG_DEFINES)] &&
+    [lsearch -exact [split $::env(RVMT_VIVADO_VERILOG_DEFINES) ","] "RV_MALTRACE_FPGA_TRACE"] >= 0} {
+    set rvmt_trace_build 1
+}
+if {$rvmt_trace_build} {
+    read_ip {
+        "xilinx/xlnx_ila/xlnx_ila.srcs/sources_1/ip/xlnx_ila/xlnx_ila.xci"
+    }
+}
 # read_ip xilinx/xlnx_protocol_checker/ip/xlnx_protocol_checker.xci
 
 set_property include_dirs { \

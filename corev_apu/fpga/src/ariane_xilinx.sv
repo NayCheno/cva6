@@ -837,6 +837,10 @@ trace_pkg::trace_packet_t rvmt_trace_packet;
 logic rvmt_trace_valid;
 (* keep = "true", dont_touch = "true" *) logic [63:0] rvmt_trace_event_count;
 (* keep = "true", dont_touch = "true" *) logic [63:0] rvmt_trace_event_hash;
+localparam int unsigned RVMT_TRACE_ILA_PAYLOAD_WIDTH = 104;
+logic        rvmt_trace_fire;
+logic [31:0] rvmt_trace_probe_primary;
+logic [RVMT_TRACE_ILA_PAYLOAD_WIDTH-1:0] rvmt_trace_probe_payload;
 `endif
 
 ariane #(
@@ -924,6 +928,58 @@ ariane #(
       .satp_i('0),
       .trace_valid_o(rvmt_trace_valid),
       .trace_packet_o(rvmt_trace_packet)
+  );
+
+  assign rvmt_trace_fire = rvmt_trace_valid && rvmt_trace_packet.valid;
+
+  always_comb begin
+    rvmt_trace_probe_primary = 32'd0;
+
+    unique case (rvmt_trace_packet.evt)
+      trace_pkg::EVT_BRANCH,
+      trace_pkg::EVT_JUMP: begin
+        rvmt_trace_probe_primary = rvmt_trace_packet.target[31:0];
+      end
+      trace_pkg::EVT_SYSCALL_ENTRY: begin
+        rvmt_trace_probe_primary = rvmt_trace_packet.a7[31:0];
+      end
+      trace_pkg::EVT_SYSCALL_RET: begin
+        rvmt_trace_probe_primary = rvmt_trace_packet.syscall_id[31:0];
+      end
+      trace_pkg::EVT_TRAP: begin
+        rvmt_trace_probe_primary = rvmt_trace_packet.cause[31:0];
+      end
+      trace_pkg::EVT_CSR: begin
+        rvmt_trace_probe_primary = {20'd0, rvmt_trace_packet.csr};
+      end
+      trace_pkg::EVT_SATP: begin
+        rvmt_trace_probe_primary = rvmt_trace_packet.satp[31:0];
+      end
+      trace_pkg::EVT_PRIV: begin
+        rvmt_trace_probe_primary = {30'd0, rvmt_trace_packet.old_priv};
+      end
+      trace_pkg::EVT_DROP,
+      trace_pkg::EVT_MARKER: begin
+        rvmt_trace_probe_primary = rvmt_trace_packet.value[31:0];
+      end
+      default: begin
+        rvmt_trace_probe_primary = 32'd0;
+      end
+    endcase
+  end
+
+  assign rvmt_trace_probe_payload = {
+      4'd0,
+      rvmt_trace_probe_primary,
+      rvmt_trace_packet.pc[31:0],
+      rvmt_trace_packet.cycle[31:0],
+      rvmt_trace_packet.evt
+  };
+
+  xlnx_ila i_rvmt_trace_ila (
+      .clk(clk),
+      .probe0(rvmt_trace_fire),
+      .probe1(rvmt_trace_probe_payload)
   );
 
   always_ff @(posedge clk or negedge ndmreset_n) begin

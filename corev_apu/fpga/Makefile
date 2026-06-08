@@ -15,6 +15,10 @@ ips := xlnx_axi_clock_converter.xci  \
 	   xlnx_dpti_clk.xci             \
        xlnx_mig_7_ddr3.xci
 
+ifeq ($(RV_MALTRACE_FPGA_TRACE),1)
+ips += xlnx_ila.xci
+endif
+
 ips := $(addprefix $(work-dir)/, $(ips))
 ips-target := $(join $(addsuffix /ip/, $(addprefix $(ip-dir)/, $(basename $(ips)))), $(ips))
 
