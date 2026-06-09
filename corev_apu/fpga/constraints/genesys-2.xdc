@@ -50,8 +50,8 @@ set_property -dict {PACKAGE_PIN U23 IOSTANDARD LVCMOS33} [get_ports {prog_d[7]}]
 # set_property -dict {PACKAGE_PIN W21 IOSTANDARD LVCMOS33} [get_ports {prog_d[7]}]
 
 ## UART
-set_property -dict {PACKAGE_PIN AC26 IOSTANDARD LVCMOS33 DRIVE 8 SLEW SLOW} [get_ports tx]
-set_property -dict {PACKAGE_PIN AJ27 IOSTANDARD LVCMOS33 PULLUP TRUE} [get_ports rx]
+set_property -dict {PACKAGE_PIN Y23 IOSTANDARD LVCMOS33} [get_ports tx]
+set_property -dict {PACKAGE_PIN Y20 IOSTANDARD LVCMOS33} [get_ports rx]
 
 
 ## LEDs
