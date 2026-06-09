@@ -928,7 +928,8 @@ ariane #(
       .COMMIT_PORTS(CVA6Cfg.NrCommitPorts),
       .XLEN(CVA6Cfg.XLEN),
       .ILEN(config_pkg::ILEN),
-      .VLEN(CVA6Cfg.VLEN)
+      .VLEN(CVA6Cfg.VLEN),
+      .RELAX_SRET_TO_USER_CHECK(1'b1)
   ) i_rvmt_trace_adapter (
       .clk_i(clk),
       .rst_ni(ndmreset_n),
