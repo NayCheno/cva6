@@ -841,6 +841,14 @@ localparam int unsigned RVMT_TRACE_ILA_PAYLOAD_WIDTH = 104;
 logic        rvmt_trace_fire;
 logic [31:0] rvmt_trace_probe_primary;
 logic [RVMT_TRACE_ILA_PAYLOAD_WIDTH-1:0] rvmt_trace_probe_payload;
+logic        rvmt_trace_enable_retire;
+logic        rvmt_trace_enable_branch;
+logic        rvmt_trace_enable_jump;
+logic        rvmt_trace_enable_syscall;
+logic        rvmt_trace_enable_trap;
+logic        rvmt_trace_enable_context;
+logic        rvmt_trace_enable_marker;
+logic        rvmt_trace_enable_drop;
 `endif
 
 ariane #(
@@ -883,6 +891,22 @@ ariane #(
   );
 
 `ifdef RV_MALTRACE_FPGA_TRACE
+  trace_board_minimal_ctrl i_rvmt_trace_board_minimal_ctrl (
+      .trace_enable_retire_o(rvmt_trace_enable_retire),
+      .trace_enable_branch_o(rvmt_trace_enable_branch),
+      .trace_enable_jump_o(rvmt_trace_enable_jump),
+      .trace_enable_syscall_o(rvmt_trace_enable_syscall),
+      .trace_enable_trap_o(rvmt_trace_enable_trap),
+      .trace_enable_context_o(rvmt_trace_enable_context),
+      .trace_enable_marker_o(rvmt_trace_enable_marker),
+      .trace_enable_drop_o(rvmt_trace_enable_drop),
+      .trace_pc_filter_enable_o(),
+      .trace_pc_start_o(),
+      .trace_pc_end_o(),
+      .trace_priv_filter_enable_o(),
+      .trace_priv_mask_o()
+  );
+
   for (genvar rvmt_port = 0; rvmt_port < CVA6Cfg.NrCommitPorts; rvmt_port++) begin : gen_rvmt_trace_map
     assign rvmt_rvfi_valid[rvmt_port] = rvfi_instr[rvmt_port].valid[0];
     assign rvmt_rvfi_insn[rvmt_port] = rvfi_instr[rvmt_port].insn[config_pkg::ILEN-1:0];
@@ -926,6 +950,14 @@ ariane #(
       .csr_addr_i('0),
       .csr_wdata_i('0),
       .satp_i('0),
+      .trace_enable_retire_i(rvmt_trace_enable_retire),
+      .trace_enable_branch_i(rvmt_trace_enable_branch),
+      .trace_enable_jump_i(rvmt_trace_enable_jump),
+      .trace_enable_syscall_i(rvmt_trace_enable_syscall),
+      .trace_enable_trap_i(rvmt_trace_enable_trap),
+      .trace_enable_context_i(rvmt_trace_enable_context),
+      .trace_enable_marker_i(rvmt_trace_enable_marker),
+      .trace_enable_drop_i(rvmt_trace_enable_drop),
       .trace_valid_o(rvmt_trace_valid),
       .trace_packet_o(rvmt_trace_packet)
   );

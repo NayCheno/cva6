@@ -246,6 +246,7 @@ endif
 
 ifeq ($(RV_MALTRACE_FPGA_TRACE),1)
 rvmt_fpga_src := $(RV_MALTRACE_ROOT)/rtl/trace/trace_pkg.sv \
+                 $(RV_MALTRACE_ROOT)/rtl/trace/trace_board_minimal_ctrl.sv \
                  $(RV_MALTRACE_ROOT)/rtl/trace/cva6_rvfi_trace_adapter.sv
 src := $(rvmt_fpga_src) $(src)
 endif
