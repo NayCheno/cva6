@@ -3,6 +3,26 @@ set boardName  $::env(XILINX_BOARD)
 
 set ipName xlnx_ila
 
+proc rvmt_env_or_default {name default} {
+  if {[info exists ::env($name)]} {
+    set value [string trim $::env($name)]
+    if {[string length $value] > 0} {
+      return $value
+    }
+  }
+  return $default
+}
+
+set dataDepth [rvmt_env_or_default RVMT_ILA_DATA_DEPTH 1024]
+set inputPipeStages [rvmt_env_or_default RVMT_ILA_INPUT_PIPE_STAGES 1]
+set storageQual [rvmt_env_or_default RVMT_ILA_STORAGE_QUAL 0]
+set advTrigger [rvmt_env_or_default RVMT_ILA_ADV_TRIGGER FALSE]
+
+puts "RVMT_ILA_DATA_DEPTH=$dataDepth"
+puts "RVMT_ILA_INPUT_PIPE_STAGES=$inputPipeStages"
+puts "RVMT_ILA_STORAGE_QUAL=$storageQual"
+puts "RVMT_ILA_ADV_TRIGGER=$advTrigger"
+
 create_project $ipName . -force -part $partNumber
 set_property board_part $boardName [current_project]
 
@@ -10,8 +30,10 @@ create_ip -name ila -vendor xilinx.com -library ip -module_name $ipName
 set_property -dict [list  CONFIG.C_NUM_OF_PROBES {2} \
                           CONFIG.C_PROBE0_WIDTH {1} \
                           CONFIG.C_PROBE1_WIDTH {104} \
-                          CONFIG.C_DATA_DEPTH {1024}  \
-                          CONFIG.C_INPUT_PIPE_STAGES {1} \
+                          CONFIG.C_DATA_DEPTH $dataDepth \
+                          CONFIG.C_INPUT_PIPE_STAGES $inputPipeStages \
+                          CONFIG.C_EN_STRG_QUAL $storageQual \
+                          CONFIG.C_ADV_TRIGGER $advTrigger \
                     ] [get_ips $ipName]
 
 
