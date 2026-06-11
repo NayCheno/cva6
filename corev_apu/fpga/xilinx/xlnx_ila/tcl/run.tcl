@@ -13,10 +13,10 @@ proc rvmt_env_or_default {name default} {
   return $default
 }
 
-set dataDepth [rvmt_env_or_default RVMT_ILA_DATA_DEPTH 1024]
-set inputPipeStages [rvmt_env_or_default RVMT_ILA_INPUT_PIPE_STAGES 1]
-set storageQual [rvmt_env_or_default RVMT_ILA_STORAGE_QUAL 0]
-set advTrigger [rvmt_env_or_default RVMT_ILA_ADV_TRIGGER FALSE]
+set dataDepth [rvmt_env_or_default RVMT_ILA_DATA_DEPTH 8192]
+set inputPipeStages [rvmt_env_or_default RVMT_ILA_INPUT_PIPE_STAGES 2]
+set storageQual [rvmt_env_or_default RVMT_ILA_STORAGE_QUAL 1]
+set advTrigger [rvmt_env_or_default RVMT_ILA_ADV_TRIGGER TRUE]
 
 puts "RVMT_ILA_DATA_DEPTH=$dataDepth"
 puts "RVMT_ILA_INPUT_PIPE_STAGES=$inputPipeStages"
