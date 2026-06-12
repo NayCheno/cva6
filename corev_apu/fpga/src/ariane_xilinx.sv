@@ -49,6 +49,12 @@ module ariane_xilinx (
   input  logic [ 7:0]  sw          ,
   output logic         fan_pwm     ,
   input  logic         trst_n      ,
+  output logic         oled_dc     ,
+  output logic         oled_res    ,
+  output logic         oled_sclk   ,
+  output logic         oled_sdin   ,
+  output logic         oled_vbat   ,
+  output logic         oled_vdd    ,
 `elsif KC705
   input  logic         sys_clk_p   ,
   input  logic         sys_clk_n   ,
@@ -1133,6 +1139,125 @@ ariane #(
                                rvmt_trace_packet.cycle ^ {60'd0, rvmt_trace_packet.evt};
     end
   end
+`endif
+
+`ifdef GENESYSII
+  localparam logic [2:0] RVMT_OLED_PHASE_RESET      = 3'd0;
+  localparam logic [2:0] RVMT_OLED_PHASE_BOOTING    = 3'd1;
+  localparam logic [2:0] RVMT_OLED_PHASE_LINUX_BOOT = 3'd2;
+  localparam logic [2:0] RVMT_OLED_PHASE_UART_XFER  = 3'd3;
+  localparam logic [2:0] RVMT_OLED_PHASE_TESTING    = 3'd4;
+  localparam logic [2:0] RVMT_OLED_PHASE_TRACE_CAP  = 3'd5;
+  localparam logic [2:0] RVMT_OLED_PHASE_PTR_SNAP   = 3'd6;
+  localparam logic [2:0] RVMT_OLED_PHASE_DONE_IDLE  = 3'd7;
+  localparam logic [31:0] RVMT_OLED_IDLE_CYCLES = 32'd250_000_000;
+
+  logic [2:0]  rvmt_oled_auto_phase;
+  logic [2:0]  rvmt_oled_phase;
+  logic [31:0] rvmt_oled_idle_count;
+  logic        rvmt_oled_rx_q;
+  logic        rvmt_oled_tx_q;
+  wire         rvmt_oled_manual_mode;
+  wire         rvmt_oled_rx_activity;
+  wire         rvmt_oled_tx_activity;
+
+`ifdef RV_MALTRACE_FPGA_TRACE
+  wire rvmt_oled_trace_fire = rvmt_trace_fire;
+  wire rvmt_oled_marker_begin = rvmt_trace_fire &&
+                                rvmt_trace_packet.evt == trace_pkg::EVT_MARKER &&
+                                rvmt_trace_packet.value[31:28] == 4'hb;
+  wire rvmt_oled_marker_end = rvmt_trace_fire &&
+                              rvmt_trace_packet.evt == trace_pkg::EVT_MARKER &&
+                              rvmt_trace_packet.value[31:28] == 4'he;
+  wire rvmt_oled_arg_mem = rvmt_trace_fire &&
+                           rvmt_trace_packet.evt == trace_pkg::EVT_ARG_MEM;
+`else
+  wire rvmt_oled_trace_fire = 1'b0;
+  wire rvmt_oled_marker_begin = 1'b0;
+  wire rvmt_oled_marker_end = 1'b0;
+  wire rvmt_oled_arg_mem = 1'b0;
+`endif
+
+  assign rvmt_oled_manual_mode = sw[7];
+  assign rvmt_oled_rx_activity = rvmt_oled_rx_q ^ rx;
+  assign rvmt_oled_tx_activity = rvmt_oled_tx_q ^ tx;
+  assign rvmt_oled_phase = rvmt_oled_manual_mode ? sw[2:0] : rvmt_oled_auto_phase;
+
+  always_ff @(posedge clk or negedge ndmreset_n) begin
+    if (~ndmreset_n) begin
+      rvmt_oled_auto_phase <= RVMT_OLED_PHASE_BOOTING;
+      rvmt_oled_idle_count <= 32'd0;
+      rvmt_oled_rx_q <= 1'b1;
+      rvmt_oled_tx_q <= 1'b1;
+    end else begin
+      rvmt_oled_rx_q <= rx;
+      rvmt_oled_tx_q <= tx;
+
+      if (!cpu_resetn) begin
+        rvmt_oled_auto_phase <= RVMT_OLED_PHASE_RESET;
+        rvmt_oled_idle_count <= 32'd0;
+      end else if (rvmt_oled_auto_phase == RVMT_OLED_PHASE_RESET) begin
+        rvmt_oled_auto_phase <= RVMT_OLED_PHASE_BOOTING;
+        rvmt_oled_idle_count <= 32'd0;
+      end else if (rvmt_oled_marker_begin) begin
+        rvmt_oled_auto_phase <= RVMT_OLED_PHASE_TESTING;
+        rvmt_oled_idle_count <= 32'd0;
+      end else if (rvmt_oled_arg_mem) begin
+        rvmt_oled_auto_phase <= RVMT_OLED_PHASE_PTR_SNAP;
+        rvmt_oled_idle_count <= 32'd0;
+      end else if (rvmt_oled_marker_end) begin
+        rvmt_oled_auto_phase <= RVMT_OLED_PHASE_DONE_IDLE;
+        rvmt_oled_idle_count <= 32'd0;
+      end else if (rvmt_oled_trace_fire) begin
+        if (rvmt_oled_auto_phase != RVMT_OLED_PHASE_TESTING &&
+            rvmt_oled_auto_phase != RVMT_OLED_PHASE_PTR_SNAP) begin
+          rvmt_oled_auto_phase <= RVMT_OLED_PHASE_TRACE_CAP;
+        end
+        rvmt_oled_idle_count <= 32'd0;
+      end else if (rvmt_oled_rx_activity) begin
+        if (rvmt_oled_auto_phase == RVMT_OLED_PHASE_BOOTING ||
+            rvmt_oled_auto_phase == RVMT_OLED_PHASE_LINUX_BOOT ||
+            rvmt_oled_auto_phase == RVMT_OLED_PHASE_UART_XFER ||
+            rvmt_oled_auto_phase == RVMT_OLED_PHASE_DONE_IDLE) begin
+          rvmt_oled_auto_phase <= RVMT_OLED_PHASE_UART_XFER;
+        end
+        rvmt_oled_idle_count <= 32'd0;
+      end else if (rvmt_oled_tx_activity) begin
+        if (rvmt_oled_auto_phase == RVMT_OLED_PHASE_BOOTING ||
+            rvmt_oled_auto_phase == RVMT_OLED_PHASE_UART_XFER) begin
+          rvmt_oled_auto_phase <= RVMT_OLED_PHASE_LINUX_BOOT;
+        end
+        rvmt_oled_idle_count <= 32'd0;
+      end else if (rvmt_oled_idle_count == RVMT_OLED_IDLE_CYCLES - 1) begin
+        if (rvmt_oled_auto_phase == RVMT_OLED_PHASE_UART_XFER ||
+            rvmt_oled_auto_phase == RVMT_OLED_PHASE_TESTING ||
+            rvmt_oled_auto_phase == RVMT_OLED_PHASE_TRACE_CAP ||
+            rvmt_oled_auto_phase == RVMT_OLED_PHASE_PTR_SNAP) begin
+          rvmt_oled_auto_phase <= RVMT_OLED_PHASE_DONE_IDLE;
+        end
+      end else begin
+        rvmt_oled_idle_count <= rvmt_oled_idle_count + 32'd1;
+      end
+    end
+  end
+
+  rvmt_genesys2_oled_status #(
+      .CLK_HZ(50_000_000),
+      .SPI_HALF_CYCLES(10)
+  ) i_rvmt_genesys2_oled_status (
+      .clk(clk),
+      .rst_n(ndmreset_n),
+      .phase(rvmt_oled_phase),
+      .manual_mode(rvmt_oled_manual_mode),
+      .oled_dc(oled_dc),
+      .oled_res(oled_res),
+      .oled_sclk(oled_sclk),
+      .oled_sdin(oled_sdin),
+      .oled_vbat(oled_vbat),
+      .oled_vdd(oled_vdd),
+      .ready(),
+      .updating()
+  );
 `endif
 
 
