@@ -645,10 +645,14 @@ module ariane_testharness #(
   logic [CVA6Cfg.NrCommitPorts-1:0][1:0] rvmt_rvfi_mode;
   logic [CVA6Cfg.NrCommitPorts-1:0] rvmt_rvfi_compressed;
   logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.VLEN-1:0] rvmt_rvfi_pc;
+  logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.VLEN-1:0] rvmt_rvfi_pc_wdata;
   logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_rs1;
   logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_rs2;
   logic [CVA6Cfg.NrCommitPorts-1:0][4:0] rvmt_rvfi_rd;
   logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_rd_wdata;
+  logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.VLEN-1:0] rvmt_rvfi_mem_addr;
+  logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_mem_rdata;
+  logic [CVA6Cfg.NrCommitPorts-1:0][(CVA6Cfg.XLEN/8)-1:0] rvmt_rvfi_mem_rmask;
 
   localparam logic [11:0] RVMT_CSR_SSTATUS = 12'h100;
   localparam logic [11:0] RVMT_CSR_STVEC   = 12'h105;
@@ -846,10 +850,14 @@ module ariane_testharness #(
     assign rvmt_rvfi_mode[rvmt_port] = rvfi_instr[rvmt_port].mode[1:0];
     assign rvmt_rvfi_compressed[rvmt_port] = rvfi_to_iti.is_compressed[rvmt_port];
     assign rvmt_rvfi_pc[rvmt_port] = rvfi_instr[rvmt_port].pc_rdata[CVA6Cfg.VLEN-1:0];
+    assign rvmt_rvfi_pc_wdata[rvmt_port] = rvfi_instr[rvmt_port].pc_wdata[CVA6Cfg.VLEN-1:0];
     assign rvmt_rvfi_rs1[rvmt_port] = rvfi_instr[rvmt_port].rs1_rdata[CVA6Cfg.XLEN-1:0];
     assign rvmt_rvfi_rs2[rvmt_port] = rvfi_instr[rvmt_port].rs2_rdata[CVA6Cfg.XLEN-1:0];
     assign rvmt_rvfi_rd[rvmt_port] = rvfi_instr[rvmt_port].rd_addr[4:0];
     assign rvmt_rvfi_rd_wdata[rvmt_port] = rvfi_instr[rvmt_port].rd_wdata[CVA6Cfg.XLEN-1:0];
+    assign rvmt_rvfi_mem_addr[rvmt_port] = rvfi_instr[rvmt_port].mem_addr[CVA6Cfg.VLEN-1:0];
+    assign rvmt_rvfi_mem_rdata[rvmt_port] = rvfi_instr[rvmt_port].mem_rdata[CVA6Cfg.XLEN-1:0];
+    assign rvmt_rvfi_mem_rmask[rvmt_port] = rvfi_instr[rvmt_port].mem_rmask[(CVA6Cfg.XLEN/8)-1:0];
   end
 
   always_comb begin
@@ -900,7 +908,10 @@ module ariane_testharness #(
       .COMMIT_PORTS(CVA6Cfg.NrCommitPorts),
       .XLEN(CVA6Cfg.XLEN),
       .ILEN(config_pkg::ILEN),
-      .VLEN(CVA6Cfg.VLEN)
+      .VLEN(CVA6Cfg.VLEN),
+      .ENABLE_USER_POINTER_SNAPSHOT(1'b1),
+      .MAX_POINTER_SNAPSHOT_BYTES(64),
+      .MAX_POINTER_WATCH_CYCLES(262144)
   ) i_rvmt_trace_adapter (
       .clk_i(clk_i),
       .rst_ni(ndmreset_n),
@@ -912,10 +923,15 @@ module ariane_testharness #(
       .rvfi_mode_i(rvmt_rvfi_mode),
       .rvfi_compressed_i(rvmt_rvfi_compressed),
       .rvfi_pc_rdata_i(rvmt_rvfi_pc),
+      .rvfi_pc_wdata_i(rvmt_rvfi_pc_wdata),
       .rvfi_rs1_rdata_i(rvmt_rvfi_rs1),
       .rvfi_rs2_rdata_i(rvmt_rvfi_rs2),
       .rvfi_rd_addr_i(rvmt_rvfi_rd),
       .rvfi_rd_wdata_i(rvmt_rvfi_rd_wdata),
+      .trace_mem_mode_i(trace_pkg::TRACE_MEM_MODE_RANGE),
+      .rvfi_mem_addr_i(rvmt_rvfi_mem_addr),
+      .rvfi_mem_rdata_i(rvmt_rvfi_mem_rdata),
+      .rvfi_mem_rmask_i(rvmt_rvfi_mem_rmask),
       .csr_valid_i(rvmt_csr_valid),
       .csr_addr_i(rvmt_csr_addr),
       .csr_wdata_i(rvmt_csr_wdata),
