@@ -846,10 +846,15 @@ trace_pkg::trace_packet_t rvmt_trace_packet;
 logic rvmt_trace_valid;
 (* keep = "true", dont_touch = "true" *) logic [63:0] rvmt_trace_event_count;
 (* keep = "true", dont_touch = "true" *) logic [63:0] rvmt_trace_event_hash;
+logic rvmt_trace_uart_tx;
+(* keep = "true", dont_touch = "true", mark_debug = "true" *) logic rvmt_trace_uart_active;
+(* keep = "true", dont_touch = "true", mark_debug = "true" *) logic [63:0] rvmt_trace_uart_accepted_count;
+(* keep = "true", dont_touch = "true", mark_debug = "true" *) logic [63:0] rvmt_trace_uart_dropped_count;
+(* keep = "true", dont_touch = "true", mark_debug = "true" *) logic rvmt_trace_uart_done;
 localparam int unsigned RVMT_TRACE_ILA_PAYLOAD_WIDTH = 136;
 localparam int unsigned RVMT_TRACE_BRAM_RING_DEPTH = 1024;
 localparam int unsigned RVMT_TRACE_BRAM_RING_ADDR_WIDTH = $clog2(RVMT_TRACE_BRAM_RING_DEPTH);
-localparam int unsigned RVMT_TRACE_BRAM_PROBE_WIDTH = 484;
+localparam int unsigned RVMT_TRACE_BRAM_PROBE_WIDTH = 716;
 logic        rvmt_trace_fire;
 logic [31:0] rvmt_trace_probe_primary;
 logic [31:0] rvmt_trace_probe_aux;
@@ -857,6 +862,9 @@ logic [RVMT_TRACE_ILA_PAYLOAD_WIDTH-1:0] rvmt_trace_probe_payload;
 logic [RVMT_TRACE_BRAM_PROBE_WIDTH-1:0] rvmt_trace_bram_probe_payload;
 trace_pkg::trace_compact_record_t rvmt_trace_bram_dump_record;
 logic rvmt_trace_bram_clear;
+logic rvmt_trace_bram_freeze;
+logic rvmt_trace_bram_marker_begin;
+logic rvmt_trace_bram_marker_end;
 (* keep = "true", dont_touch = "true", mark_debug = "true" *) logic [RVMT_TRACE_BRAM_RING_ADDR_WIDTH-1:0] rvmt_trace_bram_dump_index;
 (* keep = "true", dont_touch = "true", mark_debug = "true" *) logic rvmt_trace_bram_dump_valid;
 (* keep = "true", dont_touch = "true", mark_debug = "true" *) logic rvmt_trace_bram_full;
@@ -875,6 +883,13 @@ logic rvmt_trace_bram_clear;
 (* keep = "true", dont_touch = "true", mark_debug = "true" *) logic [31:0] rvmt_trace_bram_dump_pc;
 (* keep = "true", dont_touch = "true", mark_debug = "true" *) logic [31:0] rvmt_trace_bram_dump_cycle;
 (* keep = "true", dont_touch = "true", mark_debug = "true" *) logic [3:0] rvmt_trace_bram_dump_evt;
+(* keep = "true", dont_touch = "true", mark_debug = "true" *) logic [63:0] rvmt_trace_bram_dump_mem_base;
+(* keep = "true", dont_touch = "true", mark_debug = "true" *) logic [63:0] rvmt_trace_bram_dump_mem_addr;
+(* keep = "true", dont_touch = "true", mark_debug = "true" *) logic [63:0] rvmt_trace_bram_dump_mem_data;
+(* keep = "true", dont_touch = "true", mark_debug = "true" *) logic [31:0] rvmt_trace_bram_dump_syscall_id;
+(* keep = "true", dont_touch = "true", mark_debug = "true" *) logic [2:0] rvmt_trace_bram_dump_arg_index;
+(* keep = "true", dont_touch = "true", mark_debug = "true" *) logic [3:0] rvmt_trace_bram_dump_mem_size;
+(* keep = "true", dont_touch = "true", mark_debug = "true" *) logic rvmt_trace_bram_dump_mem_last;
 logic        rvmt_trace_enable_retire;
 logic        rvmt_trace_enable_branch;
 logic        rvmt_trace_enable_jump;
@@ -883,6 +898,9 @@ logic        rvmt_trace_enable_trap;
 logic        rvmt_trace_enable_context;
 logic        rvmt_trace_enable_marker;
 logic        rvmt_trace_enable_drop;
+logic        rvmt_trace_pc_filter_enable;
+logic [63:0] rvmt_trace_pc_start;
+logic [63:0] rvmt_trace_pc_end;
 `endif
 
 ariane #(
@@ -934,9 +952,9 @@ ariane #(
       .trace_enable_context_o(rvmt_trace_enable_context),
       .trace_enable_marker_o(rvmt_trace_enable_marker),
       .trace_enable_drop_o(rvmt_trace_enable_drop),
-      .trace_pc_filter_enable_o(),
-      .trace_pc_start_o(),
-      .trace_pc_end_o(),
+      .trace_pc_filter_enable_o(rvmt_trace_pc_filter_enable),
+      .trace_pc_start_o(rvmt_trace_pc_start),
+      .trace_pc_end_o(rvmt_trace_pc_end),
       .trace_priv_filter_enable_o(),
       .trace_priv_mask_o()
   );
@@ -1003,14 +1021,31 @@ ariane #(
       .trace_enable_context_i(rvmt_trace_enable_context),
       .trace_enable_marker_i(rvmt_trace_enable_marker),
       .trace_enable_drop_i(rvmt_trace_enable_drop),
+      .trace_pc_filter_enable_i(rvmt_trace_pc_filter_enable),
+      .trace_pc_start_i(rvmt_trace_pc_start),
+      .trace_pc_end_i(rvmt_trace_pc_end),
       .trace_valid_o(rvmt_trace_valid),
       .trace_packet_o(rvmt_trace_packet)
   );
 
   assign rvmt_trace_fire = rvmt_trace_valid && rvmt_trace_packet.valid;
-  assign rvmt_trace_bram_clear = rvmt_trace_fire &&
-                                 rvmt_trace_packet.evt == trace_pkg::EVT_MARKER &&
-                                 rvmt_trace_packet.value[31:28] == 4'hb;
+  assign rvmt_trace_bram_marker_begin = rvmt_trace_fire &&
+                                        rvmt_trace_packet.evt == trace_pkg::EVT_MARKER &&
+                                        rvmt_trace_packet.value[31:28] == 4'hb;
+  assign rvmt_trace_bram_marker_end = rvmt_trace_fire &&
+                                      rvmt_trace_packet.evt == trace_pkg::EVT_MARKER &&
+                                      rvmt_trace_packet.value[31:28] == 4'he;
+  assign rvmt_trace_bram_clear = rvmt_trace_bram_marker_begin;
+
+  always_ff @(posedge clk or negedge ndmreset_n) begin
+    if (!ndmreset_n) begin
+      rvmt_trace_bram_freeze <= 1'b0;
+    end else if (rvmt_trace_bram_marker_begin) begin
+      rvmt_trace_bram_freeze <= 1'b0;
+    end else if (rvmt_trace_bram_marker_end) begin
+      rvmt_trace_bram_freeze <= 1'b1;
+    end
+  end
 
   trace_bram_ring #(
       .DEPTH(RVMT_TRACE_BRAM_RING_DEPTH),
@@ -1020,7 +1055,7 @@ ariane #(
       .rst_ni(ndmreset_n),
       .clear_i(rvmt_trace_bram_clear),
       .capture_enable_i(1'b1),
-      .freeze_i(1'b0),
+      .freeze_i(rvmt_trace_bram_freeze),
       .trace_valid_i(rvmt_trace_valid),
       .trace_packet_i(rvmt_trace_packet),
       .dump_index_i(rvmt_trace_bram_dump_index),
@@ -1038,12 +1073,35 @@ ariane #(
       .full_o(rvmt_trace_bram_full)
   );
 
+  trace_uart_stream_sink #(
+      .CLK_HZ(50_000_000),
+      .BAUD(12_000_000),
+      .FIFO_DEPTH(64)
+  ) i_rvmt_trace_uart_stream_sink (
+      .clk_i(clk),
+      .rst_ni(ndmreset_n),
+      .trace_valid_i(rvmt_trace_valid),
+      .trace_packet_i(rvmt_trace_packet),
+      .tx_o(rvmt_trace_uart_tx),
+      .active_o(rvmt_trace_uart_active),
+      .accepted_count_o(rvmt_trace_uart_accepted_count),
+      .dropped_count_o(rvmt_trace_uart_dropped_count),
+      .done_o(rvmt_trace_uart_done)
+  );
+
   assign rvmt_trace_bram_dump_sequence = rvmt_trace_bram_dump_record.seq;
   assign rvmt_trace_bram_dump_aux = rvmt_trace_bram_dump_record.aux;
   assign rvmt_trace_bram_dump_primary = rvmt_trace_bram_dump_record.primary;
   assign rvmt_trace_bram_dump_pc = rvmt_trace_bram_dump_record.pc;
   assign rvmt_trace_bram_dump_cycle = rvmt_trace_bram_dump_record.cycle;
   assign rvmt_trace_bram_dump_evt = rvmt_trace_bram_dump_record.evt;
+  assign rvmt_trace_bram_dump_mem_base = rvmt_trace_bram_dump_record.mem_base_full;
+  assign rvmt_trace_bram_dump_mem_addr = rvmt_trace_bram_dump_record.mem_addr_full;
+  assign rvmt_trace_bram_dump_mem_data = rvmt_trace_bram_dump_record.mem_data_full;
+  assign rvmt_trace_bram_dump_syscall_id = rvmt_trace_bram_dump_record.syscall_id;
+  assign rvmt_trace_bram_dump_arg_index = rvmt_trace_bram_dump_record.arg_index;
+  assign rvmt_trace_bram_dump_mem_size = rvmt_trace_bram_dump_record.mem_size;
+  assign rvmt_trace_bram_dump_mem_last = rvmt_trace_bram_dump_record.mem_last;
   assign rvmt_trace_bram_probe_payload = {
       rvmt_trace_bram_event_count,
       rvmt_trace_bram_captured_count,
@@ -1055,6 +1113,13 @@ ariane #(
       rvmt_trace_bram_dump_index,
       rvmt_trace_bram_full,
       rvmt_trace_bram_dump_valid,
+      rvmt_trace_bram_dump_mem_base,
+      rvmt_trace_bram_dump_mem_addr,
+      rvmt_trace_bram_dump_mem_data,
+      rvmt_trace_bram_dump_syscall_id,
+      rvmt_trace_bram_dump_arg_index,
+      rvmt_trace_bram_dump_mem_size,
+      rvmt_trace_bram_dump_mem_last,
       rvmt_trace_bram_dump_sequence,
       rvmt_trace_bram_dump_aux,
       rvmt_trace_bram_dump_primary,
@@ -1515,6 +1580,13 @@ assign FifoEn = !usrFull && !usrEmpty;
 `endif
 
 logic clk_200MHz_ref;
+logic rvmt_console_tx;
+
+`ifdef RV_MALTRACE_FPGA_TRACE
+assign tx = rvmt_trace_uart_active ? rvmt_trace_uart_tx : rvmt_console_tx;
+`else
+assign tx = rvmt_console_tx;
+`endif
 
 ariane_peripherals #(
     .AxiAddrWidth ( AxiAddrWidth     ),
@@ -1552,7 +1624,7 @@ ariane_peripherals #(
     .timer        ( master[ariane_soc::Timer]    ),
     .irq_o        ( irq                          ),
     .rx_i         ( rx                           ),
-    .tx_o         ( tx                           ),
+    .tx_o         ( rvmt_console_tx              ),
     .eth_txck,
     .eth_rxck,
     .eth_rxctl,

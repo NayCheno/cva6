@@ -944,6 +944,9 @@ module ariane_testharness #(
       .trace_enable_context_i(1'b1),
       .trace_enable_marker_i(1'b1),
       .trace_enable_drop_i(1'b1),
+      .trace_pc_filter_enable_i(1'b0),
+      .trace_pc_start_i(64'd0),
+      .trace_pc_end_i(64'hffff_ffff_ffff_ffff),
       .trace_valid_o(rvmt_trace_valid),
       .trace_packet_o(rvmt_trace_packet)
   );
