@@ -1206,6 +1206,11 @@ ariane #(
   end
 `endif
 
+logic [11:0] rvmt_device_temp_raw12;
+logic        rvmt_device_temp_valid;
+logic [9:0]  rvmt_device_temp_celsius;
+logic [3:0]  rvmt_fan_pwm_setting;
+
 `ifdef GENESYSII
   localparam logic [2:0] RVMT_OLED_PHASE_RESET      = 3'd0;
   localparam logic [2:0] RVMT_OLED_PHASE_BOOTING    = 3'd1;
@@ -1314,6 +1319,9 @@ ariane #(
       .rst_n(ndmreset_n),
       .phase(rvmt_oled_phase),
       .manual_mode(rvmt_oled_manual_mode),
+      .temperature_celsius(rvmt_device_temp_celsius),
+      .temperature_valid(rvmt_device_temp_valid),
+      .fan_pwm_setting(rvmt_fan_pwm_setting),
       .oled_dc(oled_dc),
       .oled_res(oled_res),
       .oled_sclk(oled_sclk),
@@ -1890,10 +1898,13 @@ assign clk_200MHz_ref = ddr_clock_out;
 
 `ifdef KINTEX7
 fan_ctrl i_fan_ctrl (
-    .clk_i         ( clk        ),
-    .rst_ni        ( ndmreset_n ),
-    .pwm_setting_i ( '1         ),
-    .fan_pwm_o     ( fan_pwm    )
+    .clk_i                 ( clk                  ),
+    .rst_ni                ( ndmreset_n           ),
+    .device_temp_raw12_i   ( rvmt_device_temp_raw12 ),
+    .device_temp_valid_o   ( rvmt_device_temp_valid ),
+    .device_temp_celsius_o ( rvmt_device_temp_celsius ),
+    .pwm_setting_o         ( rvmt_fan_pwm_setting ),
+    .fan_pwm_o             ( fan_pwm              )
 );
 
 xlnx_mig_7_ddr3 i_ddr (
@@ -1962,15 +1973,18 @@ xlnx_mig_7_ddr3 i_ddr (
     .s_axi_rlast,
     .s_axi_rvalid,
     .init_calib_complete (            ), // keep open
-    .device_temp         (            ), // keep open
+    .device_temp         ( rvmt_device_temp_raw12 ),
     .sys_rst             ( cpu_resetn )
 );
 `elsif VC707
 fan_ctrl i_fan_ctrl (
-    .clk_i         ( clk        ),
-    .rst_ni        ( ndmreset_n ),
-    .pwm_setting_i ( '1         ),
-    .fan_pwm_o     ( fan_pwm    )
+    .clk_i                 ( clk                  ),
+    .rst_ni                ( ndmreset_n           ),
+    .device_temp_raw12_i   ( rvmt_device_temp_raw12 ),
+    .device_temp_valid_o   ( rvmt_device_temp_valid ),
+    .device_temp_celsius_o ( rvmt_device_temp_celsius ),
+    .pwm_setting_o         ( rvmt_fan_pwm_setting ),
+    .fan_pwm_o             ( fan_pwm              )
 );
 
 xlnx_mig_7_ddr3 i_ddr (
@@ -2039,16 +2053,19 @@ xlnx_mig_7_ddr3 i_ddr (
     .s_axi_rlast,
     .s_axi_rvalid,
     .init_calib_complete (            ), // keep open
-    .device_temp         (            ), // keep open
+    .device_temp         ( rvmt_device_temp_raw12 ),
     .sys_rst             ( cpu_resetn )
 );
 `elsif NEXYS_VIDEO
 
 fan_ctrl i_fan_ctrl (
-    .clk_i         ( clk        ),
-    .rst_ni        ( ndmreset_n ),
-    .pwm_setting_i ( '1         ),
-    .fan_pwm_o     ( fan_pwm    )
+    .clk_i                 ( clk                  ),
+    .rst_ni                ( ndmreset_n           ),
+    .device_temp_raw12_i   ( rvmt_device_temp_raw12 ),
+    .device_temp_valid_o   ( rvmt_device_temp_valid ),
+    .device_temp_celsius_o ( rvmt_device_temp_celsius ),
+    .pwm_setting_o         ( rvmt_fan_pwm_setting ),
+    .fan_pwm_o             ( fan_pwm              )
 );
 
 xlnx_mig_7_ddr3 i_ddr (
@@ -2116,7 +2133,7 @@ xlnx_mig_7_ddr3 i_ddr (
     .s_axi_rlast,
     .s_axi_rvalid,
     .init_calib_complete (            ), // keep open
-    .device_temp         (            ), // keep open
+    .device_temp         ( rvmt_device_temp_raw12 ),
     .sys_rst             ( cpu_resetn )
 );
 `elsif VCU118
