@@ -156,6 +156,7 @@ module ariane_gate_tb;
       .rst_ni    (rst_ni),
       .rvfi_probes_i(rvfi_probes),
       .rvfi_instr_o(rvfi_instr),
+      .rvfi_sret_to_user_o(),
       .rvfi_csr_o(rvfi_csr)
   );
 

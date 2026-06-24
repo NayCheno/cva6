@@ -139,6 +139,7 @@ module cva6_tb_wrapper import uvmt_cva6_pkg::*; #(
       .rvfi_probes_i(rvfi_probes),
       .rvfi_instr_o(rvfi_instr),
       .rvfi_to_iti_o   (rvfi_to_iti),
+      .rvfi_sret_to_user_o(),
       .rvfi_csr_o(rvfi_csr)
   );
 

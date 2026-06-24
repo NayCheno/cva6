@@ -28,6 +28,7 @@ module cva6_rvfi
     input rvfi_probes_t rvfi_probes_i,
     output rvfi_instr_t [CVA6Cfg.NrCommitPorts-1:0] rvfi_instr_o,
     output rvfi_to_iti_t rvfi_to_iti_o,
+    output logic [CVA6Cfg.NrCommitPorts-1:0] rvfi_sret_to_user_o,
     output rvfi_csr_t rvfi_csr_o
 );
 
@@ -510,6 +511,8 @@ module cva6_rvfi
 
       rvfi_instr_o[i].cause <= ex_commit_cause;
       rvfi_instr_o[i].mode <= (CVA6Cfg.DebugEn && debug_mode) ? 2'b10 : priv_lvl;
+      rvfi_sret_to_user_o[i] <= valid && commit_instr_op[i] == SRET &&
+        priv_lvl == riscv::PRIV_LVL_S && csr.mstatus_extended[8] == 1'b0;
       rvfi_instr_o[i].ixl <= CVA6Cfg.XLEN == 64 ? 2 : 1;
       rvfi_instr_o[i].rs1_addr <= commit_instr_rs1[i];
       rvfi_instr_o[i].rs2_addr <= commit_instr_rs2[i];

@@ -33,6 +33,9 @@
     device_type = "memory";
     reg = <0x0 0x80000000 0x0 DRAM_SIZE_64>;
   };
+  pmu {
+    compatible = "riscv,pmu";
+  };
   leds {
     compatible = "gpio-leds";
     heartbeat-led {

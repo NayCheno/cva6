@@ -9,11 +9,19 @@
 
 #define SECOND_CYCLES   CLOCK_FREQUENCY
 #define WAIT_SECONDS    (10)
+#define RVMT_COUNTEREN_CY_TM_IR ((uintptr_t)0x7)
 
 static inline uintptr_t get_cycle_count() {
     uintptr_t cycle;
     __asm__ volatile ("csrr %0, cycle" : "=r" (cycle));
     return cycle;
+}
+
+static inline void rvmt_enable_counter_delegation(void) {
+    uintptr_t counters = RVMT_COUNTEREN_CY_TM_IR;
+    __asm__ volatile ("csrw mcounteren, %0" :: "r" (counters));
+    __asm__ volatile ("csrw scounteren, %0" :: "r" (counters));
+    __asm__ volatile ("csrw mcountinhibit, zero");
 }
 
 int update(uint8_t *dest)
@@ -52,6 +60,8 @@ int main()
     init_uart(CLOCK_FREQUENCY, UART_BITRATE); //not needed in intel setup as UART IP is already configured via HW
     #endif 
     print_uart("Hello World!\r\n");
+    rvmt_enable_counter_delegation();
+    print_uart("RVMT counter delegation: mcounteren/scounteren CY TM IR enabled\r\n");
 
     // See if we should enter update mode
     print_uart("Hit any key to enter update mode ");

@@ -821,6 +821,7 @@ ariane_axi::resp_t   axi_ariane_resp;
 rvfi_probes_t rvfi_probes;
 
 rvfi_instr_t [CVA6Cfg.NrCommitPorts-1:0]  rvfi_instr;
+logic [CVA6Cfg.NrCommitPorts-1:0] rvfi_sret_to_user;
 rvfi_to_iti_t rvfi_to_iti;
 iti_to_encoder_t iti_to_encoder;
 
@@ -939,6 +940,7 @@ ariane #(
       .rvfi_probes_i(rvfi_probes),
       .rvfi_instr_o (rvfi_instr),
       .rvfi_to_iti_o   (rvfi_to_iti),
+      .rvfi_sret_to_user_o(rvfi_sret_to_user),
       .rvfi_csr_o   ()
   );
 
@@ -969,7 +971,7 @@ ariane #(
     assign rvmt_rvfi_compressed[rvmt_port] = rvfi_to_iti.is_compressed[rvmt_port];
     assign rvmt_rvfi_pc[rvmt_port] = rvfi_instr[rvmt_port].pc_rdata[CVA6Cfg.VLEN-1:0];
     assign rvmt_rvfi_pc_wdata[rvmt_port] = rvfi_instr[rvmt_port].pc_wdata[CVA6Cfg.VLEN-1:0];
-    assign rvmt_rvfi_sret_to_user[rvmt_port] = 1'b0;
+    assign rvmt_rvfi_sret_to_user[rvmt_port] = rvfi_sret_to_user[rvmt_port];
     assign rvmt_rvfi_rs1[rvmt_port] = rvfi_instr[rvmt_port].rs1_rdata[CVA6Cfg.XLEN-1:0];
     assign rvmt_rvfi_rs2[rvmt_port] = rvfi_instr[rvmt_port].rs2_rdata[CVA6Cfg.XLEN-1:0];
     assign rvmt_rvfi_rd[rvmt_port] = rvfi_instr[rvmt_port].rd_addr[4:0];
@@ -984,7 +986,7 @@ ariane #(
       .XLEN(CVA6Cfg.XLEN),
       .ILEN(config_pkg::ILEN),
       .VLEN(CVA6Cfg.VLEN),
-      .RELAX_SRET_TO_USER_CHECK(1'b1),
+      .RELAX_SRET_TO_USER_CHECK(1'b0),
       .ENABLE_USER_POINTER_SNAPSHOT(1'b1),
       .MAX_POINTER_SNAPSHOT_BYTES(64),
       .MAX_POINTER_WATCH_CYCLES(262144)

@@ -646,6 +646,7 @@ module ariane_testharness #(
   logic [CVA6Cfg.NrCommitPorts-1:0] rvmt_rvfi_compressed;
   logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.VLEN-1:0] rvmt_rvfi_pc;
   logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.VLEN-1:0] rvmt_rvfi_pc_wdata;
+  logic [CVA6Cfg.NrCommitPorts-1:0] rvmt_rvfi_sret_to_user;
   logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_rs1;
   logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] rvmt_rvfi_rs2;
   logic [CVA6Cfg.NrCommitPorts-1:0][4:0] rvmt_rvfi_rd;
@@ -837,6 +838,7 @@ module ariane_testharness #(
       .rvfi_probes_i(rvfi_probes),
       .rvfi_instr_o (rvfi_instr),
       .rvfi_to_iti_o   (rvfi_to_iti),
+      .rvfi_sret_to_user_o(rvmt_rvfi_sret_to_user),
       .rvfi_csr_o   (rvfi_csr)
   );
 
@@ -924,6 +926,7 @@ module ariane_testharness #(
       .rvfi_compressed_i(rvmt_rvfi_compressed),
       .rvfi_pc_rdata_i(rvmt_rvfi_pc),
       .rvfi_pc_wdata_i(rvmt_rvfi_pc_wdata),
+      .rvfi_sret_to_user_i(rvmt_rvfi_sret_to_user),
       .rvfi_rs1_rdata_i(rvmt_rvfi_rs1),
       .rvfi_rs2_rdata_i(rvmt_rvfi_rs2),
       .rvfi_rd_addr_i(rvmt_rvfi_rd),
