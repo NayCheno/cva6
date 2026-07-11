@@ -201,9 +201,12 @@ localparam config_pkg::cva6_cfg_t CVA6Cfg = build_fpga_config(cva6_config_pkg::c
 
 localparam type rvfi_probes_instr_t = `RVFI_PROBES_INSTR_T(CVA6Cfg);
 localparam type rvfi_probes_csr_t = `RVFI_PROBES_CSR_T(CVA6Cfg);
+localparam type rvfi_instr_t = `RVFI_INSTR_T(CVA6Cfg);
+localparam type rvfi_csr_elmt_t = `RVFI_CSR_ELMT_T(CVA6Cfg);
+localparam type rvfi_csr_t = `RVFI_CSR_T(CVA6Cfg, rvfi_csr_elmt_t);
 localparam type rvfi_probes_t = struct packed {
-  logic csr;
-  logic instr;
+  rvfi_probes_csr_t csr;
+  rvfi_probes_instr_t instr;
 };
 
 // 24 MByte in 8 byte words
@@ -754,8 +757,31 @@ end
 ariane_axi::req_t    axi_ariane_req;
 ariane_axi::resp_t   axi_ariane_resp;
 
+// Keep the bounded sink at an integral number of 21-word hardware frames.
+// 4095 words hold exactly 195 frames; adequacy through UART startup remains a
+// measured hardware gate rather than an assumption in this overlay.
+localparam int unsigned VET_M4_SINK_WORDS = 4095;
+rvfi_probes_t vet_rvfi_probes;
+rvfi_instr_t [CVA6Cfg.NrCommitPorts-1:0] vet_rvfi_instr;
+rvfi_csr_t vet_rvfi_csr;
+(* mark_debug = "true" *) logic [CVA6Cfg.NrCommitPorts-1:0] vet_commit_req;
+(* mark_debug = "true" *) logic [CVA6Cfg.NrCommitPorts-1:0] vet_commit_fire;
+(* mark_debug = "true" *) logic [CVA6Cfg.NrCommitPorts-1:0] vet_commit_grant;
+(* mark_debug = "true" *) logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.TRANS_ID_BITS-1:0] vet_commit_tag;
+(* mark_debug = "true" *) logic vet_debug_word_valid;
+(* mark_debug = "true" *) logic [31:0] vet_debug_word;
+(* mark_debug = "true" *) logic [31:0] vet_debug_epoch;
+(* mark_debug = "true" *) logic [$clog2(VET_M4_SINK_WORDS+1)-1:0] vet_debug_sink_words_used;
+(* mark_debug = "true" *) logic vet_debug_sink_full;
+(* mark_debug = "true" *) logic [63:0] vet_debug_stall_cycles;
+(* mark_debug = "true" *) logic vet_debug_loss;
+(* mark_debug = "true" *) logic vet_debug_sink_read_valid;
+(* mark_debug = "true" *) logic [$clog2(VET_M4_SINK_WORDS)-1:0] vet_debug_sink_read_addr;
+(* mark_debug = "true" *) logic [31:0] vet_debug_sink_read_data;
+
 ariane #(
-    .CVA6Cfg ( CVA6Cfg ),
+    .CVA6Cfg          ( CVA6Cfg  ),
+    .VET_ADMISSION_EN ( 1'b1     ),
     .rvfi_probes_instr_t ( rvfi_probes_instr_t ),
     .rvfi_probes_csr_t ( rvfi_probes_csr_t ),
     .rvfi_probes_t ( rvfi_probes_t )
@@ -767,15 +793,52 @@ ariane #(
     .irq_i        ( irq                 ),
     .ipi_i        ( ipi                 ),
     .time_irq_i   ( timer_irq           ),
-    .rvfi_probes_o( /* open */          ),
+    .rvfi_probes_o( vet_rvfi_probes     ),
     .debug_req_i  ( debug_req_irq       ),
-    .vet_commit_grant_i( '1             ),
-    .vet_commit_test_stall_i( 1'b0      ),
-    .vet_commit_req_o  (                ),
-    .vet_commit_fire_o (                ),
-    .vet_commit_tag_o  (                ),
+    .vet_commit_grant_i( vet_commit_grant ),
+    .vet_commit_test_stall_i( 1'b0       ),
+    .vet_commit_req_o  ( vet_commit_req   ),
+    .vet_commit_fire_o ( vet_commit_fire  ),
+    .vet_commit_tag_o  ( vet_commit_tag   ),
     .noc_req_o    ( axi_ariane_req      ),
     .noc_resp_i   ( axi_ariane_resp     )
+);
+
+cva6_rvfi #(
+    .CVA6Cfg(CVA6Cfg), .rvfi_instr_t(rvfi_instr_t), .rvfi_csr_t(rvfi_csr_t),
+    .rvfi_probes_instr_t(rvfi_probes_instr_t),
+    .rvfi_probes_csr_t(rvfi_probes_csr_t), .rvfi_probes_t(rvfi_probes_t)
+) i_vet_cva6_rvfi (
+    .clk_i(clk), .rst_ni(ndmreset_n), .rvfi_probes_i(vet_rvfi_probes),
+    .rvfi_instr_o(vet_rvfi_instr), .rvfi_csr_o(vet_rvfi_csr)
+);
+
+// Single-context hardware validation configuration.  The chain retains a
+// trusted ctx input, but this board overlay intentionally boots both lanes at
+// ctx_id=0 until a trusted non-reusable context monitor is integrated.
+vet_m4_cva6_precommit_chain #(
+    .FIFO_DEPTH(32), .TAG_WIDTH(CVA6Cfg.TRANS_ID_BITS),
+    .NR_SB_ENTRIES(CVA6Cfg.NR_SB_ENTRIES),
+    .NR_ISSUE_PORTS(CVA6Cfg.NrIssuePorts), .NR_COMMIT_PORTS(CVA6Cfg.NrCommitPorts),
+    .RVT_ENTRIES(8), .VHC_ENTRIES(16),
+    .RECORD_FIFO_DEPTH(8), .SINK_WORDS(VET_M4_SINK_WORDS),
+    .rvfi_probes_instr_t(rvfi_probes_instr_t)
+) i_vet_m4_precommit_chain (
+    .clk_i(clk), .rst_ni(ndmreset_n),
+    .rvfi_probes_instr_i(vet_rvfi_probes.instr),
+    .commit_req_i(vet_commit_req), .commit_tag_i(vet_commit_tag),
+    .commit_fire_i(vet_commit_fire), .commit_grant_o(vet_commit_grant),
+    .trusted_ctx_id_i({32'd0,32'd0}),
+    .sink_words_used_o(vet_debug_sink_words_used),
+    .sink_full_o(vet_debug_sink_full),
+    .stall_cycles_o(vet_debug_stall_cycles),
+    .loss_sticky_o(vet_debug_loss),
+    .debug_frame_word_valid_o(vet_debug_word_valid),
+    .debug_frame_word_o(vet_debug_word), .debug_epoch_o(vet_debug_epoch),
+    .debug_commit_grant_o(),
+    .debug_sink_read_valid_o(vet_debug_sink_read_valid),
+    .debug_sink_read_addr_o(vet_debug_sink_read_addr),
+    .debug_sink_read_data_o(vet_debug_sink_read_data)
 );
 
 `AXI_ASSIGN_FROM_REQ(slave[0], axi_ariane_req)
@@ -873,7 +936,8 @@ ariane_peripherals #(
     .InclGPIO     ( 1'b1             ),
     `ifdef KINTEX7
     .InclSPI      ( 1'b1         ),
-    .InclEthernet ( 1'b1         )
+    // Vivado 2025.2 cannot elaborate the legacy RAMB16 Ethernet memory.
+    .InclEthernet ( 1'b0         )
     `elsif KC705
     .InclSPI      ( 1'b1         ),
     .InclEthernet ( 1'b0         ) // Ethernet requires RAMB16 fpga/src/ariane-ethernet/dualmem_widen8.sv to be defined

@@ -18,8 +18,12 @@ that tip, so rebasing onto it would require a separate complete revalidation.
 - D1.5 fetch/decode/resolve/flush observation monitor;
 - D1.6 lossless pre-commit request/grant/fire admission, including closure of
   architectural side effects and a tag-sticky simulation sink; and
-- deterministic Verilator lifecycle and plusarg support for both observation
-  and admission traces.
+- the M4 pre-commit payload mapper, reservation bridge, ACE pipeline, framer,
+  protected FPGA sink, and Genesys 2 integration top.
+
+The deterministic Verilator lifecycle and plusarg support cover both
+observation and admission traces. The FPGA source order is explicit in the
+top-level Makefile so the package is compiled before its consumers.
 
 The implementation was migrated from the hash-locked patches and RTL in SATI
 commit `3d27177acf6b76ed130436dfb661562cc3436699`. Generated Vivado projects,
@@ -30,6 +34,9 @@ and are excluded.
 
 The SATI repository owns the Docker entrypoints, workloads, independent
 comparators, FPGA overlays, constraints, board scripts, and evidence index.
-This branch owns the CVA6-side source. A future merge or rebase onto a newer
-CVA6 `master` must rerun the full Demo gate and all CVA6/Vivado/Genesys 2
-experiments before any prior result is claimed for the new base.
+This branch owns the CVA6-side source. The M4 files are byte-identical to the
+previously audited SATI overlay inputs; keeping them here removes the need to
+replace same-module sources from a superproject Tcl hook. A future merge or
+rebase onto a newer CVA6 `master` must rerun the full Demo gate and all
+CVA6/Vivado/Genesys 2 experiments before any prior result is claimed for the
+new base.

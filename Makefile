@@ -235,7 +235,18 @@ uart_src_sv:= corev_apu/fpga/src/apb_uart/src/slib_clock_div.sv     \
               corev_apu/fpga/src/apb_uart/src/apb_uart_wrap.sv
 uart_src_sv := $(addprefix $(root-dir), $(uart_src_sv))
 
-fpga_src :=  $(wildcard corev_apu/fpga/src/*.sv) $(wildcard corev_apu/fpga/src/ariane-ethernet/*.sv) common/local/util/tc_sram_fpga_wrapper.sv common/local/util/hpdcache_sram_1rw.sv common/local/util/hpdcache_sram_wbyteenable_1rw.sv vendor/pulp-platform/fpga-support/rtl/SyncSpRamBeNx64.sv vendor/pulp-platform/fpga-support/rtl/SyncSpRamBeNx32.sv vendor/pulp-platform/fpga-support/rtl/SyncSpRam.sv
+vet_fpga_src := corev_apu/fpga/src/vet_rv/vet_m4_pkg.sv \
+	corev_apu/fpga/src/vet_rv/vet_m4_backend.sv \
+	corev_apu/fpga/src/vet_rv/vet_m4_record_fifo.sv \
+	corev_apu/fpga/src/vet_rv/vet_m4_pipeline.sv \
+	corev_apu/fpga/src/vet_rv/vet_m4_framer.sv \
+	corev_apu/fpga/src/vet_rv/vet_m4_protected_sink.sv \
+	corev_apu/fpga/src/vet_rv/vet_m4_integration_top.sv \
+	corev_apu/fpga/src/vet_rv/vet_m4_cva6_precommit_payload.sv \
+	corev_apu/fpga/src/vet_rv/vet_m4_cva6_precommit_bridge.sv \
+	corev_apu/fpga/src/vet_rv/vet_m4_cva6_precommit_chain.sv
+
+fpga_src :=  $(wildcard corev_apu/fpga/src/*.sv) $(vet_fpga_src) $(wildcard corev_apu/fpga/src/ariane-ethernet/*.sv) common/local/util/tc_sram_fpga_wrapper.sv common/local/util/hpdcache_sram_1rw.sv common/local/util/hpdcache_sram_wbyteenable_1rw.sv vendor/pulp-platform/fpga-support/rtl/SyncSpRamBeNx64.sv vendor/pulp-platform/fpga-support/rtl/SyncSpRamBeNx32.sv vendor/pulp-platform/fpga-support/rtl/SyncSpRam.sv
 
 altera_src := $(shell find $(root-dir)/corev_apu/altera/src -type f \( -name "*.v" -o -name "*.sv" -o -name "*.svh" \) -print | sed 's|//|/|g')
 altera_src += $(src)
