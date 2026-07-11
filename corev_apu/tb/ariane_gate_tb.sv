@@ -118,6 +118,11 @@ module ariane_gate_tb;
         .time_irq_i           ( 1'b0  /*timer_irq*/ ),
         .debug_req_i          ( 1'b0                ),
         .rvfi_probes_o        ( rvfi_probes         ),
+        .vet_commit_grant_i   ( '1                  ),
+        .vet_commit_test_stall_i( 1'b0              ),
+        .vet_commit_req_o     (                     ),
+        .vet_commit_fire_o    (                     ),
+        .vet_commit_tag_o     (                     ),
         .noc_req_o            ( axi_ariane_req      ),
         .noc_resp_i           ( axi_ariane_resp     )
     );

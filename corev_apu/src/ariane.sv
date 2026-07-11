@@ -16,6 +16,7 @@
 
 module ariane import ariane_pkg::*; #(
   parameter config_pkg::cva6_cfg_t CVA6Cfg = config_pkg::cva6_cfg_empty,
+  parameter bit VET_ADMISSION_EN = 1'b0,
   parameter type rvfi_probes_instr_t = logic,
   parameter type rvfi_probes_csr_t = logic,
   parameter type rvfi_probes_t = struct packed {
@@ -61,6 +62,12 @@ module ariane import ariane_pkg::*; #(
   // RISC-V formal interface port (`rvfi`):
   // Can be left open when formal tracing is not needed.
   output rvfi_probes_t rvfi_probes_o,
+  // Pre-commit evidence reservation interface (VET D1).
+  input  logic [CVA6Cfg.NrCommitPorts-1:0] vet_commit_grant_i,
+  input  logic                              vet_commit_test_stall_i,
+  output logic [CVA6Cfg.NrCommitPorts-1:0] vet_commit_req_o,
+  output logic [CVA6Cfg.NrCommitPorts-1:0] vet_commit_fire_o,
+  output logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.TRANS_ID_BITS-1:0] vet_commit_tag_o,
   // memory side
   output noc_req_t                     noc_req_o,
   input  noc_resp_t                    noc_resp_i
@@ -71,6 +78,7 @@ module ariane import ariane_pkg::*; #(
 
   cva6 #(
     .CVA6Cfg ( CVA6Cfg ),
+    .VET_ADMISSION_EN ( VET_ADMISSION_EN ),
     .rvfi_probes_instr_t ( rvfi_probes_instr_t ),
     .rvfi_probes_csr_t ( rvfi_probes_csr_t ),
     .rvfi_probes_t ( rvfi_probes_t ),
@@ -102,6 +110,11 @@ module ariane import ariane_pkg::*; #(
     .time_irq_i           ( time_irq_i                ),
     .debug_req_i          ( debug_req_i               ),
     .rvfi_probes_o        ( rvfi_probes_o             ),
+    .vet_commit_grant_i   ( vet_commit_grant_i        ),
+    .vet_commit_test_stall_i( vet_commit_test_stall_i ),
+    .vet_commit_req_o     ( vet_commit_req_o          ),
+    .vet_commit_fire_o    ( vet_commit_fire_o         ),
+    .vet_commit_tag_o     ( vet_commit_tag_o          ),
     .cvxif_req_o          ( cvxif_req                 ),
     .cvxif_resp_i         ( cvxif_resp                ),
     .noc_req_o            ( noc_req_o                 ),

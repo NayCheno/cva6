@@ -625,9 +625,15 @@ module ariane_testharness #(
   rvfi_probes_t rvfi_probes;
   rvfi_csr_t rvfi_csr;
   rvfi_instr_t [CVA6Cfg.NrCommitPorts-1:0]  rvfi_instr;
+  logic [CVA6Cfg.NrCommitPorts-1:0] vet_commit_grant;
+  logic [CVA6Cfg.NrCommitPorts-1:0] vet_commit_req;
+  logic [CVA6Cfg.NrCommitPorts-1:0] vet_commit_fire;
+  logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.TRANS_ID_BITS-1:0] vet_commit_tag;
+  logic vet_commit_test_stall;
 
   ariane #(
     .CVA6Cfg              ( CVA6Cfg             ),
+    .VET_ADMISSION_EN     ( 1'b1                ),
     .rvfi_probes_instr_t  ( rvfi_probes_instr_t ),
     .rvfi_probes_csr_t    ( rvfi_probes_csr_t   ),
     .rvfi_probes_t        ( rvfi_probes_t       ),
@@ -642,6 +648,11 @@ module ariane_testharness #(
     .ipi_i                ( ipi                 ),
     .time_irq_i           ( timer_irq           ),
     .rvfi_probes_o        ( rvfi_probes         ),
+    .vet_commit_grant_i   ( vet_commit_grant    ),
+    .vet_commit_test_stall_i( vet_commit_test_stall ),
+    .vet_commit_req_o     ( vet_commit_req      ),
+    .vet_commit_fire_o    ( vet_commit_fire     ),
+    .vet_commit_tag_o     ( vet_commit_tag      ),
 // Disable Debug when simulating with Spike
 `ifdef SPIKE_TANDEM
     .debug_req_i          ( 1'b0                ),
@@ -650,6 +661,22 @@ module ariane_testharness #(
 `endif
     .noc_req_o            ( axi_ariane_req      ),
     .noc_resp_i           ( axi_ariane_resp     )
+  );
+
+  // Test-only abstract evidence sink. Reservations are tag-sticky and count
+  // against capacity before commit; plusargs inject a bounded consumer stop.
+  vet_commit_admission_sink #(
+    .NR_LANES  ( CVA6Cfg.NrCommitPorts   ),
+    .TAG_WIDTH ( CVA6Cfg.TRANS_ID_BITS   ),
+    .FIFO_DEPTH( 8                        )
+  ) i_vet_commit_admission_sink (
+    .clk_i   ( clk_i            ),
+    .rst_ni  ( ndmreset_n       ),
+    .req_i   ( vet_commit_req   ),
+    .tag_i   ( vet_commit_tag   ),
+    .fire_i  ( vet_commit_fire  ),
+    .grant_o ( vet_commit_grant ),
+    .consumer_stopped_o( vet_commit_test_stall )
   );
 
   `AXI_ASSIGN_FROM_REQ(slave[0], axi_ariane_req)
@@ -704,6 +731,78 @@ module ariane_testharness #(
     .rvfi_csr_i(rvfi_csr),
     .end_of_test_o(tracer_exit)
   );
+
+  vet_rvfi_sidecar #(
+    .CVA6Cfg(CVA6Cfg),
+    .rvfi_instr_t(rvfi_instr_t),
+    .HART_ID(hart_id)
+  ) i_vet_rvfi_sidecar (
+    .clk_i(clk_i),
+    .rst_ni(rst_ni),
+    .rvfi_i(rvfi_instr)
+  );
+
+  // D1.5 test-only observation taps. No signal below is driven back into
+  // CVA6; the monitor exists only in the isolated simulation configuration.
+  logic [CVA6Cfg.NrIssuePorts-1:0][CVA6Cfg.VLEN-1:0] vet_d15_fetch_pc;
+  logic [CVA6Cfg.NrIssuePorts-1:0][CVA6Cfg.VLEN-1:0] vet_d15_decode_pc;
+  logic [CVA6Cfg.NrIssuePorts-1:0][31:0] vet_d15_decode_insn;
+
+  for (genvar vet_d15_lane = 0;
+       vet_d15_lane < CVA6Cfg.NrIssuePorts;
+       vet_d15_lane++) begin : gen_vet_d15_observation_taps
+    assign vet_d15_fetch_pc[vet_d15_lane] =
+      i_ariane.i_cva6.fetch_entry_if_id[vet_d15_lane].address;
+    assign vet_d15_decode_pc[vet_d15_lane] =
+      i_ariane.i_cva6.issue_entry_id_issue[vet_d15_lane].pc;
+    assign vet_d15_decode_insn[vet_d15_lane] =
+      i_ariane.i_cva6.orig_instr_id_issue[vet_d15_lane];
+  end
+
+  vet_d15_pipeline_monitor #(
+    .CVA6Cfg(CVA6Cfg),
+    .HART_ID(hart_id)
+  ) i_vet_d15_pipeline_monitor (
+    .clk_i(clk_i),
+    .rst_ni(ndmreset_n),
+
+    .fetch_valid_i(rvfi_probes.instr.fetch_entry_valid),
+    .fetch_ready_i(i_ariane.i_cva6.fetch_ready_id_if),
+    .fetch_pc_i(vet_d15_fetch_pc),
+    .fetch_insn_i(rvfi_probes.instr.instruction),
+
+    .decode_valid_i(rvfi_probes.instr.decoded_instr_valid),
+    .decode_ack_i(rvfi_probes.instr.decoded_instr_ack),
+    .decode_pc_i(vet_d15_decode_pc),
+    .decode_insn_i(vet_d15_decode_insn),
+    .issue_pointer_i(rvfi_probes.instr.issue_pointer),
+
+    .resolved_valid_i(i_ariane.i_cva6.resolved_branch.valid),
+    .resolved_mispredict_i(i_ariane.i_cva6.resolved_branch.is_mispredict),
+    .resolved_taken_i(i_ariane.i_cva6.resolved_branch.is_taken),
+    .resolved_pc_i(i_ariane.i_cva6.resolved_branch.pc),
+    .resolved_target_i(i_ariane.i_cva6.resolved_branch.target_address),
+
+    .flush_if_i(i_ariane.i_cva6.flush_ctrl_if),
+    .flush_unissued_i(i_ariane.i_cva6.flush_unissued_instr_ctrl_id),
+    .flush_id_i(i_ariane.i_cva6.flush_ctrl_id),
+    .flush_ex_i(i_ariane.i_cva6.flush_ctrl_ex),
+
+    .frontend_replay_i(i_ariane.i_cva6.i_frontend.replay),
+    .frontend_replay_addr_i(i_ariane.i_cva6.i_frontend.replay_addr),
+    .icache_kill_s1_i(i_ariane.i_cva6.icache_dreq_if_cache.kill_s1),
+
+    .ex_commit_valid_i(rvfi_probes.instr.ex_commit_valid),
+    .ex_commit_cause_i(rvfi_probes.instr.ex_commit_cause),
+    .commit_pc_i(i_ariane.i_cva6.pc_commit),
+
+    .ipi_i(ipi),
+    .timer_irq_i(timer_irq),
+    .irq_i(irqs)
+  );
+
+  // The sidecar and pipeline monitor are observational. Lossless D1.6
+  // admission is enforced separately before architectural side effects.
 
 `ifdef SPIKE_TANDEM
     spike #(

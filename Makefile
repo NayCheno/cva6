@@ -201,9 +201,12 @@ src :=  $(if $(spike-tandem),verif/tb/core/uvma_core_cntrl_pkg.sv)              
         vendor/pulp-platform/tech_cells_generic/src/deprecated/cluster_clk_cells.sv  \
         vendor/pulp-platform/tech_cells_generic/src/deprecated/pulp_clk_cells.sv     \
         vendor/pulp-platform/tech_cells_generic/src/rtl/tc_clk.sv                    \
+        corev_apu/tb/vet_commit_admission_sink.sv                                    \
         corev_apu/tb/ariane_testharness.sv                                           \
         corev_apu/tb/ariane_peripherals.sv                                           \
         corev_apu/tb/rvfi_tracer.sv                                                  \
+        corev_apu/tb/vet_rvfi_sidecar.sv                                             \
+        corev_apu/tb/vet_d15_pipeline_monitor.sv                                     \
         corev_apu/tb/common/uart.sv                                                  \
         corev_apu/tb/common/SimDTM.sv                                                \
         corev_apu/tb/common/SimJTAG.sv
@@ -253,7 +256,8 @@ altera_src += $(root-dir)corev_apu/rv_plic/rtl/top_pkg.sv \
 							$(root-dir)core/cvfpu/src/fpu_div_sqrt_mvp/hdl/div_sqrt_mvp_wrapper.sv \
 							$(root-dir)core/cache_subsystem/amo_alu.sv
 
-altera_filter := corev_apu/tb/ariane_testharness.sv \
+altera_filter := corev_apu/tb/vet_commit_admission_sink.sv \
+								corev_apu/tb/ariane_testharness.sv \
 								corev_apu/tb/ariane_peripherals.sv \
 								corev_apu/tb/rvfi_tracer.sv \
 								corev_apu/tb/common/uart.sv \
@@ -776,6 +780,7 @@ fpga_filter += $(addprefix $(root-dir), vendor/pulp-platform/tech_cells_generic/
 fpga_filter += $(addprefix $(root-dir), common/local/util/tc_sram_wrapper.sv)
 fpga_filter += $(addprefix $(root-dir), corev_apu/tb/ariane_peripherals.sv)
 fpga_filter += $(addprefix $(root-dir), corev_apu/tb/ariane_testharness.sv)
+fpga_filter += $(addprefix $(root-dir), corev_apu/tb/vet_commit_admission_sink.sv)
 fpga_filter += $(addprefix $(root-dir), core/cache_subsystem/hpdcache/rtl/src/common/macros/behav/hpdcache_sram_1rw.sv)
 fpga_filter += $(addprefix $(root-dir), core/cache_subsystem/hpdcache/rtl/src/common/macros/behav/hpdcache_sram_wbyteenable_1rw.sv)
 fpga_filter += $(addprefix $(root-dir), core/cache_subsystem/hpdcache/rtl/src/common/macros/behav/hpdcache_sram_wmask_1rw.sv)

@@ -192,6 +192,11 @@ module ariane_verilog_wrap
     .ipi_i       ( ipi        ),
     .time_irq_i  ( time_irq   ),
     .debug_req_i ( debug_req  ),
+    .vet_commit_grant_i ( '1  ),
+    .vet_commit_test_stall_i ( 1'b0 ),
+    .vet_commit_req_o   (     ),
+    .vet_commit_fire_o  (     ),
+    .vet_commit_tag_o   (     ),
     .noc_req_o   ( l15_req    ),
     .noc_resp_i  ( l15_rtrn   )
   );

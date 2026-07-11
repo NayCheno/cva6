@@ -53,7 +53,9 @@
 // allow modulus.  You can also use a double, if you wish.
 static vluint64_t main_time = 0;
 
-static const char *verilog_plusargs[] = {"jtag_rbb_enable", "time_out", "debug_disable"};
+static const char *verilog_plusargs[] = {"jtag_rbb_enable", "time_out", "debug_disable",
+                                         "vet_rvfi_enable", "vet_rvfi_file",
+                                         "vet_admission_trace", nullptr};
 
 extern dtm_t* dtm;
 extern remote_bitbang_t * jtag;
@@ -375,6 +377,13 @@ done_processing:
     }
     main_time++;
   }
+
+  // Run SystemVerilog final blocks exactly once while the model, DPI helpers,
+  // and trace backend are still alive. std::unique_ptr destruction alone does
+  // not invoke Verilator's final() lifecycle method.
+  fflush(NULL);
+  top->final();
+  fflush(NULL);
 
 #if VM_TRACE
   if (tfp)

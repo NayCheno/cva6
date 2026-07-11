@@ -285,6 +285,7 @@ module cva6
     //
     parameter type acc_cfg_t = logic,
     parameter acc_cfg_t AccCfg = '0,
+    parameter bit VET_ADMISSION_EN = 1'b0,
     // CVXIF Types
     parameter type readregflags_t = `READREGFLAGS_T(CVA6Cfg),
     parameter type writeregflags_t = `WRITEREGFLAGS_T(CVA6Cfg),
@@ -320,6 +321,12 @@ module cva6
     input logic debug_req_i,
     // Probes to build RVFI, can be left open when not used - RVFI
     output rvfi_probes_t rvfi_probes_o,
+    // Pre-commit evidence reservation interface - VET
+    input logic [CVA6Cfg.NrCommitPorts-1:0] vet_commit_grant_i,
+    input logic vet_commit_test_stall_i,
+    output logic [CVA6Cfg.NrCommitPorts-1:0] vet_commit_req_o,
+    output logic [CVA6Cfg.NrCommitPorts-1:0] vet_commit_fire_o,
+    output logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.TRANS_ID_BITS-1:0] vet_commit_tag_o,
     // CVXIF request - SUBSYSTEM
     output cvxif_req_t cvxif_req_o,
     // CVXIF response - SUBSYSTEM
@@ -1055,6 +1062,7 @@ module cva6
 
   commit_stage #(
       .CVA6Cfg(CVA6Cfg),
+      .VET_ADMISSION_EN(VET_ADMISSION_EN),
       .exception_t(exception_t),
       .scoreboard_entry_t(scoreboard_entry_t)
   ) commit_stage_i (
@@ -1067,6 +1075,11 @@ module cva6
       .single_step_i     (single_step_csr_commit || single_step_acc_commit),
       .commit_instr_i    (commit_instr_id_commit),
       .commit_drop_i     (commit_drop_id_commit),
+      .vet_commit_grant_i(vet_commit_grant_i),
+      .vet_commit_test_stall_i(vet_commit_test_stall_i),
+      .vet_commit_req_o  (vet_commit_req_o),
+      .vet_commit_fire_o (vet_commit_fire_o),
+      .vet_commit_tag_o  (vet_commit_tag_o),
       .commit_ack_o      (commit_ack_commit_id),
       .commit_macro_ack_o(commit_macro_ack),
       .waddr_o           (waddr_commit_id),
@@ -1781,6 +1794,12 @@ module cva6
   initial begin
     assert (!(CVA6Cfg.SuperscalarEn && CVA6Cfg.EnableAccelerator))
     else $fatal(1, "Accelerator is not supported by superscalar pipeline");
+  end
+  always_ff @(posedge clk_i) begin : vet_admission_cvxif_guard
+    if (rst_ni && VET_ADMISSION_EN) begin
+      assert (!x_commit_valid)
+        else $fatal(1, "D1 VET admission excludes issue-time CVXIF commit transactions");
+    end
   end
   //pragma translate_on
 
